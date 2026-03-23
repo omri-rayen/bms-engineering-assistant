@@ -7,10 +7,15 @@ bms-engineering-assistant/
 │   ├── notebooks/
 │   └── reports/
 └── data/
-    ├── cleaned/
-    │   ├── measurement/
-    │   └── simulation/
-    └── raw/
-        ├── measurement/
-        └── simulation/
+│   ├── cleaned/
+│   │   ├── measurement/
+│   │   └── simulation/
+│   └── raw/
+│       ├── measurement/
+│       └── simulation/
+└── plant_model/
+    ├── data
+    ├── plots
+    │   └── trips/
+    └── scripts/
 ```

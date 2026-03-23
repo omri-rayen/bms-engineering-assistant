@@ -122,7 +122,7 @@ def check_file(filepath):
             mean_temp = actual_temps.mean()
             if abs(mean_temp - expected_temp) > 5:
                 findings['issues'].append(
-                    f"Ambient temp mismatch: expected temp {expected_temp}°C, mean temp {mean_temp:.1f}°C"
+                    f"Ambient temp mismatch: expected temp {expected_temp} C, mean temp {mean_temp:.1f} C"
                 )
 
     # --- check for sentinel/placeholder values (65535 is common) ---

@@ -1,2 +1,6 @@
-# Data files
+# data files
 data/
+plant_model/data/
+
+# plots
+plant_model/plots/

@@ -20,7 +20,7 @@
    - Detected and replaced isolated sensor glitches with NaN using per-signal thresholds:
      - SoC: > 3 % jump between consecutive rows
      - Battery Voltage: > 30 V jump
-     - Battery / Ambient Temperature: > 5 °C jump
+     - Battery / Ambient Temperature: > 5 C jump
 
 4. **Missing value handling**
    - Linear interpolation for small gaps (≤ 10 consecutive NaN rows)
@@ -42,7 +42,7 @@
 
 ## 2. Simulation Data Cleaning
 
-**Source**: 24 raw CSV files (12 CAN + 12 LIN, 3 temperatures × 4 scenarios)
+**Source**: 24 raw CSV files (12 CAN + 12 LIN, 3 temperatures x 4 scenarios)
 **Out**: 1 file `simulation_clean.csv`
 
 ### Steps Applied
@@ -72,7 +72,7 @@
 
 7. **Metadata columns added**
    - `sim_id`: source filename (e.g., `0_Charging_CAN`)
-   - `temperature`: numeric value extracted from filename (−10, 0, 10)
+   - `temperature`: numeric value extracted from filename (-10, 0, 10)
    - `scenario`: driving scenario (`Standard`, `Charging`, `Heating`, `Mixed`)
    - `bus_type`: heater bus model (`CAN` or `LIN`)
 

@@ -12,7 +12,7 @@
 
 - Format: CSV, semicolon-separated, latin-1 encoding
 - Time step: 0.1 s
-- TripA: warm weather (ambient 14-33.5 °C), TripB: cold weather (ambient −3.5-14 °C)
+- TripA: warm weather (ambient 14-33.5 C), TripB: cold weather (ambient -3.5-14 C)
 - TripB has ~20 extra columns vs TripA (cabin/thermal sensors)
 
 ### Issues
@@ -41,10 +41,10 @@
 |--------|--------------------------|--------------------------|
 | Velocity [km/h] | 0 / 151.6 / 43.3 | 0 / 152.3 / 45.8 |
 | Battery Voltage [V] | 349.4 / 394.8 / 382.9 | 301.8 / 394.2 / 371.6 |
-| Battery Current [A] | −395.2 / 143.5 / −15.4 | −404.4 / 144.5 / −18.7 |
-| Battery Temp [°C] | 16 / 32 / 22.4 | −1 / 22 / 10.2 |
+| Battery Current [A] | -395.2 / 143.5 / -15.4 | -404.4 / 144.5 / -18.7 |
+| Battery Temp [C] | 16 / 32 / 22.4 | -1 / 22 / 10.2 |
 | SoC [%] | 34.2 / 88.5 / 72.9 | 0.0 / 86.1 / 59.0 |
-| Ambient Temp [°C] | 14.0 / 33.5 / 23.0 | −3.5 / 14.0 / 5.5 |
+| Ambient Temp [C] | 14.0 / 33.5 / 23.0 | -3.5 / 14.0 / 5.5 |
 
 ---
 
@@ -57,7 +57,7 @@
 | Total files | 24 (12 CAN + 12 LIN) |
 | Rows per file | 38,220 (exception: Neg10_Heating_CAN has 38,221) |
 | Columns | 43 |
-| Temperature conditions | −10 °C, 0 °C, +10 °C |
+| Temperature conditions | -10 C, 0 C, +10 C |
 | Scenarios | Standard, Charging, Heating, Mixed |
 | Total rows | 917,281 |
 
@@ -73,7 +73,7 @@
 | Sentinel values | All files | `[kWh/100km]` contains 489 rows with value 65535 + 1 NaN per file |
 | Duplicate column name | All files | Two columns named `Power [kW]` (Battery vs Consumption) |
 | Constant columns | All files | `Slope [rad]`, `Wind Speed [m/s]`, `Mass Jred [kg]`, `Seat Heating [W]`, `Rest Lights [W]`, `Window Lifters [W]`, `Infotainment [W]`, `Wipers [W]`, `Blower [W]`, `CU Sensors [W]` - simulation config parameters |
-| Low voltage at −10 °C | Neg10 files | Pack Voltage drops to ~220 V (expected: high internal resistance at −10 °C) |
+| Low voltage at -10 C | Neg10 files | Pack Voltage drops to ~220 V (expected: high internal resistance at -10 C) |
 
 ### No Issues Found
 
@@ -87,7 +87,7 @@
 |--------|-----|-----|------|
 | Speed [m/s] | 0.00 | 38.48 | 15.91 |
 | Pack Voltage [V] | 219.22 | 407.05 | 361.15 |
-| Battery Current [A] | −94.31 | 433.43 | 32.00 |
+| Battery Current [A] | -94.31 | 433.43 | 32.00 |
 | SOC [%] | 18.50 | 86.80 | 59.52 |
-| Mean Cell Temp [°C] | −10.00 | 14.21 | 3.60 |
-| Ambient Temp [°C] | −10.00 | 10.00 | 0.43 |
+| Mean Cell Temp [C] | -10.00 | 14.21 | 3.60 |
+| Ambient Temp [C] | -10.00 | 10.00 | 0.43 |
