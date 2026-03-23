@@ -102,21 +102,7 @@ def build_lut(qs):
                 lut[i, j] = m
                 medians[j][s] = m
 
-    # fill gaps along SoC axis with PCHIP + NMC anchors
-    for j in range(len(T_GRID)):
-        col = lut[:, j]
-        valid = ~np.isnan(col)
-        if valid.sum() < 3:     # need at least 3 points for interpolation
-            continue
-        sv = list(SOC_GRID[valid])
-        vv = list(col[valid])
-        if sv[0] > 2:
-            sv.insert(0, 0);  vv.insert(0, V_EMPTY)
-        if sv[-1] < 98:
-            sv.append(100);   vv.append(V_FULL)
-        lut[:, j] = PchipInterpolator(sv, vv)(SOC_GRID)
-
-    # fill remaining NaN along T axis (linear)
+    # fill missing values along T axis FIRST using linear interpolation/extrapolation
     for i in range(len(SOC_GRID)):
         row = lut[i, :]
         valid = ~np.isnan(row)
@@ -124,6 +110,23 @@ def build_lut(qs):
             lut[i, :] = np.interp(T_GRID, T_GRID[valid], row[valid])
         elif valid.sum() == 1:
             lut[i, :] = row[valid][0]
+
+    # fill remaining gaps along SoC axis with PCHIP + NMC anchors SECOND
+    for j in range(len(T_GRID)):
+        col = lut[:, j]
+        valid = ~np.isnan(col)
+        if valid.sum() < 3:     # need at least 3 medians for interpolation
+            continue
+        sv = list(SOC_GRID[valid])
+        vv = list(col[valid])
+        
+        # apply anchors
+        if sv[0] > 2:
+            sv.insert(0, 0);  vv.insert(0, V_EMPTY)
+        if sv[-1] < 98:
+            sv.append(100);   vv.append(V_FULL)
+            
+        lut[:, j] = PchipInterpolator(sv, vv)(SOC_GRID)
 
     remaining_nan = np.isnan(lut).sum()
     if remaining_nan:

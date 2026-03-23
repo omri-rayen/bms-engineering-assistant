@@ -174,7 +174,7 @@ def main():
     df = pd.read_csv(MEAS_CSV)
     print(f"Data: {len(df):,} rows, {df['trip_id'].nunique()} trips\n")
 
-    # Prepare output dirs, clean old plots
+    # prepare output dirs, clean old plots
     os.makedirs(TRIP_PLOTS, exist_ok=True)
     for f in glob.glob(os.path.join(TRIP_PLOTS, 'validation_*.png')):
         os.remove(f)
@@ -211,7 +211,7 @@ def main():
             'max_err_mV': maxe, 'bias_mV': bias,
         })
 
-        # Per-trip plot
+        # per-trip plot
         plot_trip(tid, t_s, V_meas, V_model, rmse, T.mean(), camp, plt)
 
         if (ti + 1) % 10 == 0 or ti + 1 == len(trip_ids):
@@ -240,13 +240,13 @@ def main():
         print(f"    Bias : mean={sub['bias_mV'].mean():.1f} mV")
         print(f"    T range: [{sub['T_mean'].min():.0f}, {sub['T_mean'].max():.0f}] C")
 
-    # Save
+    # save
     os.makedirs(DATA_DIR, exist_ok=True)
     csv_path = os.path.join(DATA_DIR, 'validation_results.csv')
     res.to_csv(csv_path, index=False)
     print(f"\n  Results saved: {csv_path}")
 
-    # Summary plots
+    # summary plots
     plot_summary(res, plt)
 
 
