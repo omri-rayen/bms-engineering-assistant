@@ -122,12 +122,17 @@ def build_r0_lut(r0_df):
 
 # --- fill + smooth ---
 def fill_and_smooth(lut, label=''):
-    # T-axis interpolation
+    # T-axis interpolation (log-space for resistances captures Arrhenius-like behaviour)
+    use_log = label.upper() in ('R0', 'R1', 'R2')
     for i in range(lut.shape[0]):
         row = lut[i, :]
         v = ~np.isnan(row)
         if v.sum() >= 2 and not v.all():
-            lut[i, :] = np.interp(T_GRID, T_GRID[v], row[v])
+            if use_log:
+                log_row = np.log(row)
+                lut[i, :] = np.exp(np.interp(T_GRID, T_GRID[v], log_row[v]))
+            else:
+                lut[i, :] = np.interp(T_GRID, T_GRID[v], row[v])
         elif v.sum() == 1:
             lut[i, :] = row[v][0]
 

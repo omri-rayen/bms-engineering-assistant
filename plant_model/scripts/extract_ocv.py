@@ -132,7 +132,7 @@ def build_lut(qs):
     if remaining_nan:
         raise ValueError(
             f"{remaining_nan} NaN values remain in LUT after interpolation. "
-            "Check data coverage — PCHIP and T-axis fill should handle all gaps."
+            "Check data coverage - PCHIP and T-axis fill should handle all gaps."
         )
 
     print(f"  LUT: V = [{lut.min():.4f}, {lut.max():.4f}] V")
@@ -161,25 +161,29 @@ def measure_ageing(qs):
         if len(va) >= 20 and len(vb) >= 5:
             deltas.append(vb.median() - va.median())
     if deltas:
-        med = np.median(deltas) * 1e3
+        offset = float(np.median(deltas))
+        med = offset * 1e3
         lo  = np.min(deltas) * 1e3
         hi  = np.max(deltas) * 1e3
         print(f"  Ageing offset (B - A): median {med:+.1f} mV  "
               f"[{lo:+.1f}, {hi:+.1f}] mV")
+        return offset
     else:
         print("  Ageing offset: no overlap data available")
+        return 0.0
 
-# def ageing_correction(qs, AGEING_OFFSET):
-#     T_AGE_MIN = 17.0
-#     T_AGE_MAX = 22.0
+def ageing_correction(qs, ageing_offset):
+    """Shift Campaign B QS points in the overlap zone down by ageing_offset [V]."""
+    T_AGE_MIN = 17.0
+    T_AGE_MAX = 22.0
 
-#     mask_b_overlap = (
-#         (qs['campaign'] == 'B') &
-#         (qs['temp'] >= T_AGE_MIN) &
-#         (qs['temp'] <= T_AGE_MAX)
-#     )
+    mask_b_overlap = (
+        (qs['campaign'] == 'B') &
+        (qs['temp'] >= T_AGE_MIN) &
+        (qs['temp'] <= T_AGE_MAX)
+    )
 
-#     qs.loc[mask_b_overlap, 'v_cell'] -= AGEING_OFFSET
+    qs.loc[mask_b_overlap, 'v_cell'] -= ageing_offset
 
 
 # save LUT
@@ -279,11 +283,10 @@ def main():
     print('\n2. Extracting quasi-static points ...')
     qs = extract_qs(df)
 
-    # print('\n3a. Applying ageing correction ...')
-    # ageing_correction(qs, 0.0151)
-
-    print('\n3. Measuring ageing offset ...')
-    measure_ageing(qs)
+    print('\n3. Measuring ageing offset and applying correction ...')
+    ageing_offset = measure_ageing(qs)
+    # ageing_correction(qs, ageing_offset)
+    # print(f"  Applied correction: {ageing_offset*1e3:+.1f} mV to Campaign B overlap zone")
 
     print('\n4. Building OCV LUT ...')
     lut, counts, medians = build_lut(qs)
