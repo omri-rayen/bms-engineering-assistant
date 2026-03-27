@@ -56,8 +56,8 @@ fprintf('RMSE=%.2f  MAE=%.2f  Max=%.2f  Bias=%.2f mV  delta SoC=%.2f%%\n', ...
 figure('Position', [100 100 900 700], 'Name', sprintf('Validation %s', TRIP_ID));
 
 subplot(3,1,1)
-plot(t_sim, V_cell_ref*1e3, 'k', t_sim, V_cell_sim*1e3, 'r--');
-ylabel('V_{cell} [mV]'); legend('Measured','ECM'); grid on
+plot(t_sim, V_cell_ref, 'k', t_sim, V_cell_sim, 'r--');
+ylabel('V_{cell} [V]'); legend('Measured','ECM'); grid on
 
 subplot(3,1,2)
 plot(t_sim, err_mV, 'b'); yline(0, 'k--');
