@@ -48,6 +48,13 @@ SPIKE_LIMITS = {
     'Ambient Temperature [°C]': 5.0,
 }
 
+# Per-trip leading trim: remove initial seconds where BMS sensors are not yet settled.
+# TripB02: BMS SoC lags ~4% behind coulomb counting during the first 200 s of
+#          heavy discharge, then tracks correctly.  Trim that initial segment.
+TRIP_TRIM_START_S = {
+    'TripB02': 200.0,
+}
+
 
 def remove_spikes(df, trip_id):
     """Replace sensor spikes (isolated glitch) with NaN."""
@@ -83,6 +90,14 @@ def load_and_clean(filepath):
     # add trip identifier
     fname = os.path.basename(filepath).replace('.csv', '')
     df.insert(0, 'trip_id', fname)
+
+    # per-trip leading trim (sensor warm-up / BMS glitch removal)
+    if fname in TRIP_TRIM_START_S:
+        t_cut = TRIP_TRIM_START_S[fname]
+        before_len = len(df)
+        df = df[df['Time [s]'] >= t_cut].copy()
+        df['Time [s]'] -= t_cut          # reset time to start at 0
+        print(f"    {fname}: trimmed first {t_cut:.0f}s ({before_len - len(df)} rows)")
 
     # remove sensor spikes before interpolation
     df = remove_spikes(df, fname)

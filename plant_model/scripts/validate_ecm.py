@@ -65,7 +65,7 @@ def lookup(interp, soc, T):
 
 
 # --- ECM simulation ---
-def simulate(I, soc, T, luts):
+def simulate(I, soc, T, luts, v0=0.0):
     N   = len(I)
     ocv = lookup(luts['ocv'], soc, T)
     r0  = np.clip(lookup(luts['r0'], soc, T), 1e-5, None)
@@ -77,7 +77,11 @@ def simulate(I, soc, T, luts):
     tau2 = r2 * c2
 
     V = np.empty(N)
-    vrc1 = vrc2 = 0.0
+    if v0 > 0.0:
+        vrc1 = r1[0] * I[0]
+        vrc2 = r2[0] * I[0]
+    else:
+        vrc1 = vrc2 = 0.0
     for k in range(N):
         V[k] = ocv[k] + I[k] * r0[k] + vrc1 + vrc2
         if k < N - 1:
@@ -191,9 +195,10 @@ def main():
         soc   = grp['soc_pct'].values
         T     = grp['battery_temperature_c'].values
         t_s   = grp['time_s'].values
+        v0    = grp['velocity_kmh'].values[0]
         camp  = 'A' if tid.startswith('TripA') else 'B'
 
-        V_model = simulate(I, soc, T, luts)
+        V_model = simulate(I, soc, T, luts, v0=v0)
         err = V_model - V_meas
 
         rmse = np.sqrt(np.mean(err**2)) * 1e3

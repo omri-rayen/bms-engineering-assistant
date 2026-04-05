@@ -31,6 +31,9 @@ for k = 1:numel(tripIDs)
     trips_meas.(fn).V_pack_V  = sub.battery_voltage_v;
     trips_meas.(fn).SoC_pct   = sub.soc_pct;
     trips_meas.(fn).T_cell_C  = sub.battery_temperature_c;
+    trips_meas.(fn).T_amb_C   = sub.ambient_temperature_c;
+    trips_meas.(fn).T_cool_C  = sub.coolant_temp_inlet_c;
+    trips_meas.(fn).v_kmh     = sub.velocity_kmh;
     trips_meas.(fn).campaign  = camp;
 end
 
@@ -55,6 +58,7 @@ for k = 1:numel(simIDs)
     trips_sim.(fn).V_pack_V  = sub.pack_voltage_v;
     trips_sim.(fn).SoC_pct   = sub.soc_pct;
     trips_sim.(fn).T_cell_C  = sub.mean_cell_temperature_c;
+    trips_sim.(fn).T_amb_C   = sub.ambient_temperature_c;
     trips_sim.(fn).campaign  = char(sub.scenario(1));
 end
 
