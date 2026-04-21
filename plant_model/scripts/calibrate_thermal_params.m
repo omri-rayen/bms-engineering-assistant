@@ -1,4 +1,4 @@
-% calibrate_thermal_params.m — Calibrate cell thermal parameters via forward-ODE grid search
+% calibrate_thermal_params.m - Calibrate cell thermal parameters via forward-ODE grid search
 %
 % Evaluates candidate [Cth, h_cool, h_amb] parameter sets against
 % measurement trips that show meaningful temperature dynamics.

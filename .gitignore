@@ -1,6 +1,9 @@
 # data files
 data/
 plant_model/data/
+MIL_validation/data/
 
 # plots
 plant_model/plots/
+bms_model/plots/
+MIL_validation/plots/
