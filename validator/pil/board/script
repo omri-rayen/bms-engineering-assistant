@@ -1,0 +1,10 @@
+config load "C:\Users\rayen\Desktop\bms-engineering-assistant\PIL_validation\data\nucleo_h7a3zit_q.ioc"
+project toolchain STM32CubeIDE
+
+SetStructure Advanced
+
+project setCustomFWPath "C:\Users\rayen\STM32Cube\Repository\STM32Cube_FW_H7_V1.9.1"
+
+project generate 
+
+exit wait

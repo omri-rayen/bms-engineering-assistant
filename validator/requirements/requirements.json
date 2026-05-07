@@ -1,0 +1,272 @@
+{
+  "version": "4.0",
+  "authored": "2026-05-06",
+  "scope": "Requirements for the model-level MBD process: Plant (96s1p Samsung SDI 60Ah, BMW i3 dataset), BMS (1 master + 8 slaves), and embedded LSTM fault predictor. Verified under MIL, SIL, PIL.",
+  "phase_descriptions": {
+    "PLANT": "Validate the closed-loop virtual battery plant against the BMW i3 measurement dataset. Standalone phase, independent from the BMS MIL/SIL/PIL pipeline. Verifies the plant model is fit-for-purpose before it is used as the reference for BMS verification.",
+    "MIL": "Verify functional logic and algorithms of the BMS and the embedded LSTM predictor against the virtual plant in simulation, before any code generation.",
+    "SIL": "Confirm that the generated C-code of bms_master and bms_slave behaves identically to the original Simulink model on the host computer; identify numerical overflows, memory errors and code-generation artefacts early.",
+    "PIL": "Ensure the generated software runs correctly on the STM32H7A3 target MCU; verify real-time execution performance, processor compatibility, and LSTM inference correctness on the ARM Cortex-M7 while the plant remains a simulation."
+  },
+  "phase_mapping": {
+    "plant_convergence":       ["PLANT"],
+    "bms_functional":          ["MIL", "SIL"],
+    "bms_sil_equivalence":     ["SIL"],
+    "predictor_functional":    ["MIL"],
+    "predictor_on_target":     ["PIL"],
+    "real_time_wcet":          ["PIL"]
+  },
+  "thresholds_source": "model/system/params/init_system.m (single source of truth)",
+
+  "high_level": [
+    {
+      "id": "REQ-HL-PLT-01",
+      "component": "plant",
+      "text": "The closed-loop plant (cell_ecm_2rc -> module_12s -> pack_96s with coolant loop, heater and chiller) SHALL converge to the BMW i3 measurement dataset on V_pack, SoC and T_pack across the 70 measurement trips."
+    },
+    {
+      "id": "REQ-HL-BMS-01",
+      "component": "bms",
+      "text": "The BMS (bms_master + bms_slave) SHALL provide: cell-voltage monitoring, cell-temperature monitoring, pack-current monitoring, fault detection with debouncing, fault-severity state machine, SoC estimation, SoH estimation, cell balancing, thermal management, power limitation, slave watchdog, and an independent hardware protection path."
+    },
+    {
+      "id": "REQ-HL-BMS-02",
+      "component": "bms",
+      "text": "The BMS SHALL be a modular master/slave architecture: exactly one bms_master and exactly eight bms_slave instances, one slave per 12-cell module of the 96s1p pack."
+    },
+    {
+      "id": "REQ-HL-BMS-03",
+      "component": "bms",
+      "text": "The BMS SHALL be verified under MIL and SIL on the host computer, and under PIL on the STM32 Nucleo-H7A3ZI-Q target."
+    },
+    {
+      "id": "REQ-HL-PRD-01",
+      "component": "predictor",
+      "text": "The embedded LSTM fault predictor SHALL output, at every BMS step, a per-class probability vector prob_3 and a binary alarm vector alarm_3 for the three classes (OT, OV, UV), and SHALL raise alarms ahead of the corresponding BMS warn-level fault flags. The predictor is informational only: it SHALL NOT take any proactive action on the plant."
+    }
+  ],
+
+  "low_level": [
+
+    {
+      "id": "REQ-LL-PLT-V-01",
+      "parent": "REQ-HL-PLT-01",
+      "component": "plant",
+      "phases": ["PLANT"],
+      "text": "Both the median AND the mean of RMSE(V_pack) computed across the 70 measurement trips SHALL be <= 4.0 V (= 1 % of the 384 V nominal pack voltage = 40 mV per cell averaged over 96 series cells)."
+    },
+    {
+      "id": "REQ-LL-PLT-SOC-01",
+      "parent": "REQ-HL-PLT-01",
+      "component": "plant",
+      "phases": ["PLANT"],
+      "text": "Both the median AND the mean of RMSE(SoC_pack) computed across the 70 measurement trips SHALL be <= 1 %."
+    },
+    {
+      "id": "REQ-LL-PLT-T-01",
+      "parent": "REQ-HL-PLT-01",
+      "component": "plant",
+      "phases": ["PLANT"],
+      "text": "Both the median AND the mean of RMSE(T_pack) computed across the 70 measurement trips SHALL be <= 1 degC."
+    },
+
+    {
+      "id": "REQ-LL-BMS-VMON-01",
+      "parent": "REQ-HL-BMS-01",
+      "component": "bms_slave",
+      "function": "voltage_monitoring",
+      "phases": ["MIL", "SIL"],
+      "text": "Voltage_Monitor SHALL raise OV warn when any V_cell > bms.V_OV_warn (4.15 V) for >= bms.N_debounce_warn samples, OV derate when V_cell > bms.V_OV_derate (4.20 V) for >= bms.N_debounce_derate samples, and OV shut when V_cell > bms.V_OV_shut (4.25 V) for >= bms.N_debounce_shut samples."
+    },
+    {
+      "id": "REQ-LL-BMS-VMON-02",
+      "parent": "REQ-HL-BMS-01",
+      "component": "bms_slave",
+      "function": "voltage_monitoring",
+      "phases": ["MIL", "SIL"],
+      "text": "Voltage_Monitor SHALL raise UV warn when any V_cell < bms.V_UV_warn (2.80 V) for >= bms.N_debounce_warn samples, UV derate when V_cell < bms.V_UV_derate (2.60 V) for >= bms.N_debounce_derate samples, and UV shut when V_cell < bms.V_UV_shut (2.50 V) for >= bms.N_debounce_shut samples."
+    },
+
+    {
+      "id": "REQ-LL-BMS-TMON-01",
+      "parent": "REQ-HL-BMS-01",
+      "component": "bms_slave",
+      "function": "temperature_monitoring",
+      "phases": ["MIL", "SIL"],
+      "text": "Temperature_Monitor SHALL raise OT warn when any T_sensor > bms.T_OT_warn (45 degC) for >= bms.N_debounce_warn samples, OT derate when T_sensor > bms.T_OT_derate (55 degC) for >= bms.N_debounce_derate samples, and OT shut when T_sensor > bms.T_OT_shut (60 degC) for >= bms.N_debounce_shut samples."
+    },
+    {
+      "id": "REQ-LL-BMS-TMON-02",
+      "parent": "REQ-HL-BMS-01",
+      "component": "bms_slave",
+      "function": "temperature_monitoring",
+      "phases": ["MIL", "SIL"],
+      "text": "Temperature_Monitor SHALL raise UT warn when any T_sensor < bms.T_UT_warn (0 degC) for >= bms.N_debounce_warn samples, UT derate when T_sensor < bms.T_UT_derate (-10 degC) for >= bms.N_debounce_derate samples, and UT shut when T_sensor < bms.T_UT_shut (-20 degC) for >= bms.N_debounce_shut samples."
+    },
+
+    {
+      "id": "REQ-LL-BMS-IMON-01",
+      "parent": "REQ-HL-BMS-01",
+      "component": "bms_master",
+      "function": "current_monitoring",
+      "phases": ["MIL", "SIL"],
+      "text": "Current_Monitor SHALL raise OC-charge warn when I_pack < -bms.I_OC_chg_warn (-150 A) for >= bms.N_debounce_warn samples, derate at -bms.I_OC_chg_derate (-200 A), and shut at -bms.I_OC_chg_shut (-300 A) with the matching debounce counts."
+    },
+    {
+      "id": "REQ-LL-BMS-IMON-02",
+      "parent": "REQ-HL-BMS-01",
+      "component": "bms_master",
+      "function": "current_monitoring",
+      "phases": ["MIL", "SIL"],
+      "text": "Current_Monitor SHALL raise OC-discharge warn when I_pack > bms.I_OC_dchg_warn (350 A) for >= bms.N_debounce_warn samples, derate at bms.I_OC_dchg_derate (420 A), and shut at bms.I_OC_dchg_shut (500 A) with the matching debounce counts."
+    },
+
+    {
+      "id": "REQ-LL-BMS-FSM-01",
+      "parent": "REQ-HL-BMS-01",
+      "component": "bms_master",
+      "function": "fault_severity_fsm",
+      "phases": ["MIL", "SIL"],
+      "text": "Fault_Severity_FSM SHALL escalate Nominal -> Warn -> Derate -> Shutdown using the debounced fault flags, and SHALL recover Warn -> Nominal automatically when all flags clear for >= bms.N_debounce_warn samples. Shutdown SHALL latch and require an external reset."
+    },
+
+    {
+      "id": "REQ-LL-BMS-SOC-01",
+      "parent": "REQ-HL-BMS-01",
+      "component": "bms_master",
+      "function": "soc_estimation",
+      "phases": ["MIL", "SIL"],
+      "text": "EKF_SoC_Estimator SHALL converge SoC_pack to within 3 % absolute of the truth within 60 s, starting from a 2 % initial-condition error, on a constant 30 A discharge."
+    },
+
+    {
+      "id": "REQ-LL-BMS-SOH-01",
+      "parent": "REQ-HL-BMS-01",
+      "component": "bms_master",
+      "function": "soh_estimation",
+      "phases": ["MIL", "SIL"],
+      "text": "SoH_Estimator output SHALL remain inside [0.5, 1.0] and SHALL be non-increasing within a single trip (monotonic-decay tolerance: 1e-4 per step)."
+    },
+
+    {
+      "id": "REQ-LL-BMS-BAL-01",
+      "parent": "REQ-HL-BMS-01",
+      "component": "bms_slave",
+      "function": "balancing",
+      "phases": ["MIL", "SIL"],
+      "text": "Cell_Balance_Ctrl SHALL output I_bal_12 = 0 when enable_bal is false. When enable_bal is true, the cell with the highest V SHALL receive a non-zero discharge current of magnitude bms.bal_I_nom (0.25 A)."
+    },
+    {
+      "id": "REQ-LL-BMS-BAL-02",
+      "parent": "REQ-HL-BMS-01",
+      "component": "system_model",
+      "function": "balancing_effectiveness",
+      "phases": ["MIL"],
+      "text": "On the longest available measured trip, the maximum cell-voltage spread max(V_cells) - min(V_cells) over the trip SHALL stay within the OEM safety envelope of 200 mV. Justification: passive balancing at bms.bal_I_nom = 0.25 A cannot beat the dynamic IR-drop differences within a single high-current trip; the BMS guarantee is that the spread is BOUNDED, not that it is reduced by an arbitrary % over a short rest window. Full equalisation accumulates across multiple high-SoC rest periods (e.g. overnight charging). This criterion mirrors the validated test_integration_balancing_trip in the previous project release."
+    },
+
+    {
+      "id": "REQ-LL-BMS-THM-01",
+      "parent": "REQ-HL-BMS-01",
+      "component": "bms_master",
+      "function": "thermal_management",
+      "phases": ["MIL", "SIL"],
+      "text": "Thermal_Manager SHALL assert P_heat_cmd when T_pack < T_heat_on (8 degC) and de-assert at T_pack >= T_heat_off (18 degC); SHALL assert P_chill_cmd when T_pack > T_cool_on (35 degC) and de-assert at T_pack <= T_cool_off (25 degC). Heater and chiller SHALL never be active simultaneously."
+    },
+
+    {
+      "id": "REQ-LL-BMS-PWR-01",
+      "parent": "REQ-HL-BMS-01",
+      "component": "bms_master",
+      "function": "power_limitation",
+      "phases": ["MIL", "SIL"],
+      "text": "Power_Limiter SHALL reduce P_limit_chg and P_limit_dchg by >= 20 % when fault_severity = Derate, and SHALL force both to 0 W when fault_severity = Shutdown."
+    },
+
+    {
+      "id": "REQ-LL-BMS-WDG-01",
+      "parent": "REQ-HL-BMS-01",
+      "component": "bms_master",
+      "function": "slave_watchdog",
+      "phases": ["MIL", "SIL"],
+      "text": "Slave_Watchdog SHALL escalate fault_severity to >= Warn when any slave fault_flag stream is frozen (no value change) for >= bms.N_watchdog_timeout (100) consecutive BMS steps."
+    },
+
+    {
+      "id": "REQ-LL-BMS-HWP-01",
+      "parent": "REQ-HL-BMS-01",
+      "component": "system_model",
+      "function": "hw_protection",
+      "phases": ["MIL", "SIL"],
+      "text": "HW_Protection_Path SHALL assert shutdown_cmd within a single BMS step (no debounce) when |I_pack| >= bms.I_SC_thresh (800 A) OR any V_cell >= bms.V_OVP2_thresh (4.50 V)."
+    },
+
+    {
+      "id": "REQ-LL-PRD-LT-01",
+      "parent": "REQ-HL-PRD-01",
+      "component": "fault_predictor",
+      "function": "lead_time_OT",
+      "phases": ["MIL"],
+      "text": "Across all OT injection scenarios x test-split trips, the median per-event alarm_3(OT) lead time vs the BMS Nominal->Warn(OT) transition SHALL be >= 15 s. Justification: the LSTM is trained with a 30 s OT look-ahead horizon (H_OT_samples=300); a trained classifier fires near the centre of its discriminative window so the natural median-lead ceiling is ~H/2 = 15 s. 15 s also provides 14 s of margin above the BMS warn-fault debounce (1 s at dt=0.1 s) which is enough for a thermal control-loop response."
+    },
+    {
+      "id": "REQ-LL-PRD-LT-02",
+      "parent": "REQ-HL-PRD-01",
+      "component": "fault_predictor",
+      "function": "lead_time_OV",
+      "phases": ["MIL"],
+      "text": "Across all OV injection scenarios x test-split trips, the median per-event alarm_3(OV) lead time vs the BMS Nominal->Warn(OV) transition SHALL be >= 10 s."
+    },
+    {
+      "id": "REQ-LL-PRD-LT-03",
+      "parent": "REQ-HL-PRD-01",
+      "component": "fault_predictor",
+      "function": "lead_time_UV",
+      "phases": ["MIL"],
+      "text": "Across all UV injection scenarios x test-split trips, the median per-event alarm_3(UV) lead time vs the BMS Nominal->Warn(UV) transition SHALL be >= 10 s."
+    },
+    {
+      "id": "REQ-LL-PRD-DR-01",
+      "parent": "REQ-HL-PRD-01",
+      "component": "fault_predictor",
+      "function": "detection_rate",
+      "phases": ["MIL"],
+      "text": "Per-class sample-level detection rate (TP / (TP + FN)) on the injected-fault test split SHALL be >= 75 % for each of the three classes (OT, OV, UV). Aggregated across all (class scenario, test trip) pairs. Justification: the trained LSTM's documented per-class recall on the held-out test split (ai/fault_prediction/models/test_report.json) is OT=0.999, OV=0.796, UV=0.883; OV is the binding rare-event class. The 75 % floor reflects the validated model's documented capability with margin for closed-loop stochasticity (cell-variability seed, EKF transients)."
+    },
+    {
+      "id": "REQ-LL-PRD-FAR-01",
+      "parent": "REQ-HL-PRD-01",
+      "component": "fault_predictor",
+      "function": "false_alarm_rate",
+      "phases": ["MIL"],
+      "text": "On the set of nominal trips (no injected faults), the fraction of trip duration during which any alarm_3(c) is asserted SHALL be <= 10 %."
+    },
+
+    {
+      "id": "REQ-LL-SIL-EQ-01",
+      "parent": "REQ-HL-BMS-03",
+      "component": "bms_master",
+      "function": "sil_code_equivalence",
+      "phases": ["SIL"],
+      "text": "For every BMS functional test scenario (voltage/temperature/current monitoring, FSM, EKF, SoH, balancing, thermal management, power limiter, slave watchdog), the generated C-code executed in SIL mode on the host SHALL produce outputs (fault_severity, SoC_pack, SoH_pack, P_limit_chg, P_limit_dchg, enable_bal_8, prob_3, alarm_3) that match MIL outputs to within 1 % relative tolerance (or 1e-4 absolute for near-zero values). This confirms that no numerical overflow, memory error, or code-generation artefact has been introduced."
+    },
+
+    {
+      "id": "REQ-LL-RT-WCET-01",
+      "parent": "REQ-HL-BMS-03",
+      "component": "bms_master",
+      "function": "real_time_performance",
+      "phases": ["PIL"],
+      "text": "bms_master SHALL execute one BMS step in <= 10 ms worst-case on the STM32 Nucleo-H7A3ZI-Q (Cortex-M7 @ 280 MHz), measured as wall-clock elapsed / n_steps over at least 300 consecutive PIL simulation steps. Wall-clock time is a conservative upper bound (includes PIL serial round-trip overhead) so the true on-chip execution time is strictly less. Reference step time Ts = 100 ms (10x margin). Note: Embedded Coder hardware-timer profiling (TIM5) is not used because it requires CubeMX TIM5 configuration absent from the current .ioc file and causes the PIL serial handshake to hang on this target; the old validated project (bms-engineering-assistant_old) also did not use profiling instrumentation."
+    },
+
+    {
+      "id": "REQ-LL-PIL-PRD-01",
+      "parent": "REQ-HL-PRD-01",
+      "component": "fault_predictor",
+      "function": "lstm_on_target",
+      "phases": ["PIL"],
+      "text": "The embedded LSTM fault predictor, executing inside bms_master on the STM32H7A3 (ARM Cortex-M7 @ 280 MHz) in PIL mode, SHALL produce prob_3 outputs with a maximum absolute error <= 1e-3 per class compared to MIL reference values, across the OT, OV and UV fault scenarios. This confirms correct floating-point operation, memory layout and LSTM inference pipeline on the target processor."
+    }
+  ]
+}
