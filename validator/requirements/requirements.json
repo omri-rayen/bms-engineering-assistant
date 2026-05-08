@@ -257,7 +257,16 @@
       "component": "bms_master",
       "function": "real_time_performance",
       "phases": ["PIL"],
-      "text": "bms_master SHALL execute one BMS step in <= req.RT_WCET_max_us on the STM32 Nucleo-H7A3ZI-Q (Cortex-M7 @ 280 MHz), measured as the MAX over at least req.RT_WCET_min_steps consecutive PIL steps at Ts = 100 ms (after skipping req.RT_WCET_warmup cold-start steps for LSTM weight load + cache priming) by Embedded Coder code-execution profiling sampled on the free-running 32-bit TIM5 counter (1 tick = 1/280 MHz = 3.57 ns). The HAL 1 kHz time base is relocated from TIM5 to TIM7 in the CubeMX .ioc to free TIM5 for profiling. NVIC priorities (PriorityGroup 4): USART3_IRQn = 0 and DMA1_Stream0_IRQn = 0 (highest, PIL transport, never preempted); TIM7_IRQn = 15 (lowest, HAL tick can be deferred); TIM5 has no IRQ enabled (free-running, read directly via TIM5->CNT) so it cannot preempt the PIL serial."
+      "text": "bms_master SHALL execute one BMS step in <= req.RT_WCET_max_us (10 ms = 10% CPU load at the 100 ms BMS tick) on the STM32 Nucleo-H7A3ZI-Q (Cortex-M7 @ 280 MHz), measured as the MAX over at least req.RT_WCET_min_steps consecutive PIL steps at Ts = 100 ms (after skipping req.RT_WCET_warmup cold-start steps for LSTM weight load + cache priming) by Embedded Coder code-execution profiling sampled on the free-running 32-bit TIM5 counter (1 tick = 1/280 MHz = 3.57 ns). The HAL 1 kHz time base is relocated from TIM5 to TIM7 in the CubeMX .ioc to free TIM5 for profiling. NVIC priorities (PriorityGroup 4): USART3_IRQn = 0 and DMA1_Stream0_IRQn = 0 (highest, PIL transport, never preempted); TIM7_IRQn = 15 (lowest, HAL tick can be deferred); TIM5 has no IRQ enabled (free-running, read directly via TIM5->CNT) so it cannot preempt the PIL serial. The PIL ELF is built with -O3 (BuildConfiguration = 'Faster Runs')."
+    },
+
+    {
+      "id": "REQ-LL-RT-RAM-01",
+      "parent": "REQ-HL-BMS-03",
+      "component": "bms_master",
+      "function": "memory_footprint",
+      "phases": ["PIL"],
+      "text": "The bms_master PIL ELF static RAM footprint (initialised .data + zero-initialised .bss) SHALL stay below req.RT_RAM_max_kb on the STM32H7A3ZI-Q (1.4 MB on-chip SRAM available), measured by arm-none-eabi-size on the linked ELF after a Faster-Runs build. This bounds the runtime memory needed for model state, LSTM weights and code-execution profiling buffers, leaving headroom for HAL, FreeRTOS-style tasks and stack growth."
     },
 
     {

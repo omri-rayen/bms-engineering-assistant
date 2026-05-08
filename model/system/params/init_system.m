@@ -208,9 +208,10 @@ req.PRD_FAR_max     = 0.10;
 req.SIL_EQ_rel_tol = 1e-2;
 req.SIL_EQ_abs_tol = 1e-4;
 % Real-time + on-target predictor (REQ-LL-RT-*, REQ-LL-PIL-*)
-req.RT_WCET_max_us       = 100000.0; % BMS Ts = 100 ms hard real-time bound
+req.RT_WCET_max_us       = 10000.0;  % 10 ms = 10% CPU load at 100 ms BMS tick
 req.RT_WCET_warmup       = 5;        % skip cold-start steps (LSTM weights, caches)
 req.RT_WCET_min_steps    = 300;
+req.RT_RAM_max_kb        = 256;      % static RAM (data+bss) budget on STM32H7A3 (1.4 MB total)
 req.PIL_PRD_prob_abs_tol = 1e-3;
 
 %% Bus objects from data dictionary

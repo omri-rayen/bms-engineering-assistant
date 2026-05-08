@@ -46,3 +46,4 @@ ai/fault_prediction/data/
 
 # Heavy regenerated drive-cycle bus
 model/plant/params/drivecycles_sim.mat
+validator/reports/pil_run.log

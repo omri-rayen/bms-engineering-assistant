@@ -52,6 +52,9 @@ for i = 1:numel(refs)
     set_param(m, 'ProdEqTarget',      'on');
     % Drop any code-replacement library inherited from the host SIL build.
     set_param(m, 'CodeReplacementLibrary', 'None');
+    % Compile the embedded code with -O3 (Faster Runs); the BMS step is
+    % LSTM-heavy and at -O0 it overruns the 100 ms BMS tick by ~96 ms.
+    set_param(m, 'BuildConfiguration', 'Faster Runs');
 
     % Point the STM32 target at the bundled Nucleo H7A3 CubeMX project
     % and the ST-Link virtual COM port for the PIL serial transport.
@@ -80,10 +83,14 @@ for i = 1:numel(refs)
     end
     codertarget.data.setData(cs, data);
 
-    % Per-step on-chip execution-time samples for the WCET test.
+    % Per-step on-chip execution-time samples for the WCET test. We only
+    % need the model-step section, so use coarse-grained instrumentation
+    % (a single TIM5 read pair per BMS step). 'Detailed' would wrap every
+    % atomic subsystem (including each LSTM gate) and add multi-ms of
+    % pure profiling overhead -- pointless for a top-level WCET budget.
     if strcmp(m, mdl)
         set_param(m, 'CodeExecutionProfiling',       'on');
-        set_param(m, 'CodeProfilingInstrumentation', 'Detailed');
+        set_param(m, 'CodeProfilingInstrumentation', 'Coarse');
         set_param(m, 'CodeProfilingSaveOptions',     'AllData');
     end
 end
