@@ -55,7 +55,7 @@
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
-extern TIM_HandleTypeDef htim5;
+extern TIM_HandleTypeDef htim7;
 
 /* USER CODE BEGIN EV */
 
@@ -214,17 +214,30 @@ __attribute__((weak)) void DMA1_Stream0_IRQHandler (void)
 }
 
 /**
-  * @brief This function handles TIM5 global interrupt.
+  * @brief This function handles USART3 global interrupt.
   */
-__attribute__((weak)) void TIM5_IRQHandler (void)
+__attribute__((weak)) void USART3_IRQHandler (void)
 {
-  /* USER CODE BEGIN TIM5_IRQn 0 */
+  /* USER CODE BEGIN USART3_IRQn 0 */
 
-  /* USER CODE END TIM5_IRQn 0 */
-  HAL_TIM_IRQHandler(&htim5);
-  /* USER CODE BEGIN TIM5_IRQn 1 */
+  /* USER CODE END USART3_IRQn 0 */
+  /* USER CODE BEGIN USART3_IRQn 1 */
 
-  /* USER CODE END TIM5_IRQn 1 */
+  /* USER CODE END USART3_IRQn 1 */
+}
+
+/**
+  * @brief This function handles TIM7 global interrupt.
+  */
+__attribute__((weak)) void TIM7_IRQHandler (void)
+{
+  /* USER CODE BEGIN TIM7_IRQn 0 */
+
+  /* USER CODE END TIM7_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim7);
+  /* USER CODE BEGIN TIM7_IRQn 1 */
+
+  /* USER CODE END TIM7_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */

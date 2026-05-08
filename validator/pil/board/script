@@ -1,4 +1,4 @@
-config load "C:\Users\rayen\Desktop\bms-engineering-assistant\PIL_validation\data\nucleo_h7a3zit_q.ioc"
+config load "C:\Users\rayen\Desktop\bms-engineering-assistant\validator\pil\board\nucleo_h7a3zit_q.ioc"
 project toolchain STM32CubeIDE
 
 SetStructure Advanced

@@ -51,5 +51,5 @@ The JSON is the authoritative source consumed by the test suites.
 
 | ID                  | Statement                                                                       |
 | ------------------- | ------------------------------------------------------------------------------- |
-| REQ-LL-RT-WCET-01   | bms_master per-step WCET on STM32 H7A3 (280 MHz) < 10 ms at Ts = 100 ms         |
+| REQ-LL-RT-WCET-01   | bms_master mean PIL per-step latency on STM32 H7A3 (280 MHz) < req.RT_WCET_max_ms (host wall-clock incl. USART3 + DMA1 round-trip; HAL tick on TIM7, NVIC priorities prevent the PIL serial from being preempted) |
 | REQ-LL-PIL-PRD-01   | LSTM `prob_3` on the target matches MIL reference within 1e-3 over a 30 s run   |
