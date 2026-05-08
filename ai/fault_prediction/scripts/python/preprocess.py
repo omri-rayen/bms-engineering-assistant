@@ -25,8 +25,9 @@ OUT_DIR   = DATA_DIR / "preprocessed"
 MAT_PATH  = DATA_DIR / "dataset.mat"
 LOG_PATH  = DATA_DIR / "log.csv"
 
-W = 50    # window length [samples]   (5 s at 10 Hz)
-S = 5     # stride         [samples]   (0.5 s)
+W = 50    # BPTT window length [samples] (5 s at 10 Hz). Inference is
+          # stateful (1 sample/step); W only sets the training unroll depth.
+S = 1     # stride [samples] (0.1 s = match runtime cadence, no subsampling)
 
 FEATURES = ["Vmin", "Vmax", "SoC", "Tmax", "Tcool", "Ipack", "dVmin", "dTmax"]
 LABELS   = ["OT", "OV", "UV"]

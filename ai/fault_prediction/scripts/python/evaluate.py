@@ -28,10 +28,11 @@ MODEL_DIR = ROOT / "models"
 PLOT_DIR  = ROOT / "plots"
 PLOT_DIR.mkdir(parents=True, exist_ok=True)
 
-LABELS  = ["OT", "OV", "UV"]
-DT      = 0.1     # sample period [s]
-S       = 5       # window stride [samples]  -- must match preprocess.py
-BATCH   = 512
+LABELS    = ["OT", "OV", "UV"]
+DT        = 0.1   # sample period [s]
+S         = 1     # window stride [samples] -- must match preprocess.py
+BATCH     = 512
+LOOKBACK_S = 20.0 # how far back (s) to scan for a pre-event prediction
 
 
 def load_test():
@@ -62,7 +63,7 @@ def event_lead_times(y_true, y_pred, stride_s):
     the lead time computed here is "time between alarm and warn fault",
     which is the quantity gated by REQ-FP-04 (>= MIN_LEAD_S).
     """
-    LOOKBACK = 200    # ~100 s of pre-event search
+    LOOKBACK = max(1, int(round(LOOKBACK_S / stride_s)))
     leads, n_events = [], 0
 
     padded = np.concatenate([[0], (y_true > 0).astype(int), [0]])
@@ -122,7 +123,7 @@ def main():
 
     # ---- Event-level lead times per run ----------------------------------
     print("\n=== Event-level lead times (per run, per class) ===")
-    stride_s = S * DT                       # 0.5 s
+    stride_s = S * DT                       # 0.1 s (stateful inference cadence)
 
     all_leads = {l: [] for l in LABELS}
     fa_counts = {l: 0  for l in LABELS}     # FA events on fully-nominal runs

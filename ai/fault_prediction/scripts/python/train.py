@@ -27,11 +27,13 @@ MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 LABELS      = ["OT", "OV", "UV"]
 W_MAX       = 25.0       # cap on per-class positive weight
-BATCH       = 256
-LR          = 1e-3
-MAX_EPOCHS  = 50
-ES_PATIENCE = 8
-LR_PATIENCE = 3
+BATCH       = 1024       # large batch keeps CPU throughput high on the dense
+                         # stride=1 dataset (~2M windows) without changing the
+                         # gradient signal vs the old stride=5 setup.
+LR          = 2e-3       # scaled with batch (linear rule)
+MAX_EPOCHS  = 25
+ES_PATIENCE = 5
+LR_PATIENCE = 2
 SEED        = 42
 
 
