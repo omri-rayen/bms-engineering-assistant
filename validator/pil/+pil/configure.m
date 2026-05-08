@@ -64,6 +64,27 @@ for i = 1:numel(refs)
     data.PIL.Interface            = 'Serial';
     % Nucleo-H7A3ZI-Q runs at 280 MHz.
     data.Clocking.cpuClockRateMHz = 280;
+
+    % On-chip code-execution profiling is only meaningful on the top PIL
+    % model. Sample the cycle-accurate free-running 32-bit TIM5 counter
+    % (clocked from APB1-timer = 280 MHz, no prescaler -> 1 tick = 3.57 ns,
+    % wraps every ~15.3 s). The Embedded Coder profiling runtime
+    % (profiler_timer.c, shipped in the STM32 support package) enables
+    % the TIM5 clock and starts the counter from C, so no extra .ioc
+    % entries are required. TIM5 has no NVIC IRQ -> cannot preempt the
+    % USART3 / DMA1_Stream0 PIL serial path.
+    if strcmp(m, mdl)
+        data.PIL.Timer.Source    = 'TIM5';
+        data.PIL.Timer.Prescaler = 0;
+        data.PIL.Timer.Counter   = 4294967295;
+    end
     codertarget.data.setData(cs, data);
+
+    % Per-step on-chip execution-time samples for the WCET test.
+    if strcmp(m, mdl)
+        set_param(m, 'CodeExecutionProfiling',       'on');
+        set_param(m, 'CodeProfilingInstrumentation', 'Detailed');
+        set_param(m, 'CodeProfilingSaveOptions',     'AllData');
+    end
 end
 end

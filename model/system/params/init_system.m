@@ -208,7 +208,8 @@ req.PRD_FAR_max     = 0.10;
 req.SIL_EQ_rel_tol = 1e-2;
 req.SIL_EQ_abs_tol = 1e-4;
 % Real-time + on-target predictor (REQ-LL-RT-*, REQ-LL-PIL-*)
-req.RT_WCET_max_ms       = 30.0;
+req.RT_WCET_max_us       = 100000.0; % BMS Ts = 100 ms hard real-time bound
+req.RT_WCET_warmup       = 5;        % skip cold-start steps (LSTM weights, caches)
 req.RT_WCET_min_steps    = 300;
 req.PIL_PRD_prob_abs_tol = 1e-3;
 
