@@ -1,0 +1,503 @@
+{
+  "schema_version": "1.0",
+  "timestamp": "20260510_201057",
+  "scope": [
+    "bms_slave",
+    "bms_master"
+  ],
+  "models": {
+    "bms_slave": {
+      "static": {
+        "block_count": 121,
+        "subsystem_count": 17,
+        "atomic_count": 0,
+        "depth_max": 2,
+        "deep_blocks_list": [
+          {
+            "path": "bms_slave/Cell_Balance_Ctrl/Compare\nTo Constant/u",
+            "depth": 2
+          },
+          {
+            "path": "bms_slave/Cell_Balance_Ctrl/Compare\nTo Constant/Compare",
+            "depth": 2
+          },
+          {
+            "path": "bms_slave/Cell_Balance_Ctrl/Compare\nTo Constant/Constant",
+            "depth": 2
+          }
+        ],
+        "signal_lines": 127,
+        "unconnected_ports_list": [],
+        "unconnected_ports": 0,
+        "model_refs": "bms_slave",
+        "broken_links_list": [],
+        "broken_links": 0,
+        "cyclomatic": -1,
+        "high_cyclo_subsystems_list": [],
+        "large_subsystems_list": [],
+        "wide_atomic_subsystems_list": [],
+        "default_named_blocks_list": [
+          {
+            "path": "bms_slave/Cell_Balance_Ctrl/Constant",
+            "type": "Constant",
+            "name": "Constant",
+            "parent": "bms_slave/Cell_Balance_Ctrl"
+          },
+          {
+            "path": "bms_slave/Cell_Balance_Ctrl/Constant1",
+            "type": "Constant",
+            "name": "Constant1",
+            "parent": "bms_slave/Cell_Balance_Ctrl"
+          },
+          {
+            "path": "bms_slave/Cell_Balance_Ctrl/Product",
+            "type": "Product",
+            "name": "Product",
+            "parent": "bms_slave/Cell_Balance_Ctrl"
+          },
+          {
+            "path": "bms_slave/Cell_Balance_Ctrl/Switch",
+            "type": "Switch",
+            "name": "Switch",
+            "parent": "bms_slave/Cell_Balance_Ctrl"
+          },
+          {
+            "path": "bms_slave/Temperature_Monitor/Gain",
+            "type": "Gain",
+            "name": "Gain",
+            "parent": "bms_slave/Temperature_Monitor"
+          },
+          {
+            "path": "bms_slave/Temperature_Monitor/Gain1",
+            "type": "Gain",
+            "name": "Gain1",
+            "parent": "bms_slave/Temperature_Monitor"
+          },
+          {
+            "path": "bms_slave/Temperature_Monitor/Gain2",
+            "type": "Gain",
+            "name": "Gain2",
+            "parent": "bms_slave/Temperature_Monitor"
+          },
+          {
+            "path": "bms_slave/Temperature_Monitor/Gain3",
+            "type": "Gain",
+            "name": "Gain3",
+            "parent": "bms_slave/Temperature_Monitor"
+          },
+          {
+            "path": "bms_slave/Temperature_Monitor/Gain4",
+            "type": "Gain",
+            "name": "Gain4",
+            "parent": "bms_slave/Temperature_Monitor"
+          },
+          {
+            "path": "bms_slave/Temperature_Monitor/Gain5",
+            "type": "Gain",
+            "name": "Gain5",
+            "parent": "bms_slave/Temperature_Monitor"
+          },
+          {
+            "path": "bms_slave/Voltage_Monitor/Gain",
+            "type": "Gain",
+            "name": "Gain",
+            "parent": "bms_slave/Voltage_Monitor"
+          },
+          {
+            "path": "bms_slave/Voltage_Monitor/Gain1",
+            "type": "Gain",
+            "name": "Gain1",
+            "parent": "bms_slave/Voltage_Monitor"
+          },
+          {
+            "path": "bms_slave/Voltage_Monitor/Gain2",
+            "type": "Gain",
+            "name": "Gain2",
+            "parent": "bms_slave/Voltage_Monitor"
+          },
+          {
+            "path": "bms_slave/Voltage_Monitor/Gain3",
+            "type": "Gain",
+            "name": "Gain3",
+            "parent": "bms_slave/Voltage_Monitor"
+          },
+          {
+            "path": "bms_slave/Voltage_Monitor/Gain4",
+            "type": "Gain",
+            "name": "Gain4",
+            "parent": "bms_slave/Voltage_Monitor"
+          }
+        ],
+        "default_named_by_parent_list": [
+          {
+            "parent": "bms_slave/Cell_Balance_Ctrl",
+            "count": 4,
+            "names": "Constant, Constant1, Product, Switch",
+            "types": "Constant/Product/Switch"
+          },
+          {
+            "parent": "bms_slave/Temperature_Monitor",
+            "count": 6,
+            "names": "Gain, Gain1, Gain2, Gain3, Gain4, Gain5",
+            "types": "Gain"
+          },
+          {
+            "parent": "bms_slave/Voltage_Monitor",
+            "count": 5,
+            "names": "Gain, Gain1, Gain2, Gain3, Gain4",
+            "types": "Gain"
+          }
+        ],
+        "algebraic_loops_list": [],
+        "blocks_by_type": {
+          "Inport": 24,
+          "Outport": 23,
+          "SubSystem": 17,
+          "Gain": 16,
+          "Constant": 15,
+          "RelationalOperator": 13,
+          "MinMax": 9,
+          "Sum": 2,
+          "Product": 1,
+          "Switch": 1
+        }
+      },
+      "stateflow": {
+        "chart_count": 0,
+        "state_count": 0,
+        "transition_count": 0,
+        "junction_count": 0,
+        "charts": []
+      },
+      "solver": {
+        "solvertype": "Fixed-step",
+        "solver": "FixedStepDiscrete",
+        "fixedstep": "0.1",
+        "starttime": "0.0",
+        "stoptime": "T_stop",
+        "sample_times": 0.1,
+        "distinct_rates": 1,
+        "fundamental_step": 0.1
+      },
+      "codegen": {
+        "present": false,
+        "root": "",
+        "n_c_files": 0,
+        "n_h_files": 0,
+        "loc_total": 0,
+        "loc_main_c": 0
+      },
+      "signals": {
+        "unnamed_inter_subsys_list": [],
+        "total_lines": 127,
+        "unnamed_count": 0
+      },
+      "rates": {
+        "distinct_rates": 1,
+        "sample_time_set": "0.1",
+        "rate_transition_blocks": 0,
+        "missing_rate_transitions": []
+      },
+      "data": {
+        "magic_constants_list": [],
+        "data_store_globals_list": [],
+        "goto_global_list": []
+      },
+      "codeblock": {
+        "matlab_function_blocks_list": []
+      }
+    },
+    "bms_master": {
+      "static": {
+        "block_count": 558,
+        "subsystem_count": 64,
+        "atomic_count": 4,
+        "depth_max": 3,
+        "deep_blocks_list": [
+          {
+            "path": "bms_master/Fault_Debounce/Temp_Logic/Compare\nTo Constant/u",
+            "depth": 3
+          },
+          {
+            "path": "bms_master/Fault_Debounce/Temp_Logic/Compare\nTo Constant/Compare",
+            "depth": 3
+          },
+          {
+            "path": "bms_master/Fault_Debounce/Temp_Logic/Compare\nTo Constant/Constant",
+            "depth": 3
+          }
+        ],
+        "signal_lines": 633,
+        "unconnected_ports_list": [
+          {
+            "path": "bms_master/SoH_Estimator",
+            "type": "outport",
+            "port": 1,
+            "parent": "bms_master",
+            "block_type": "SubSystem"
+          },
+          {
+            "path": "bms_master/SoH_Estimator",
+            "type": "outport",
+            "port": 2,
+            "parent": "bms_master",
+            "block_type": "SubSystem"
+          }
+        ],
+        "unconnected_ports": 2,
+        "model_refs": [
+          "fault_predictor",
+          "bms_master"
+        ],
+        "broken_links_list": [],
+        "broken_links": 0,
+        "cyclomatic": -1,
+        "high_cyclo_subsystems_list": [],
+        "large_subsystems_list": [],
+        "wide_atomic_subsystems_list": [],
+        "default_named_blocks_list": [
+          {
+            "path": "bms_master/ EKF_SoC_Estimator/Constant",
+            "type": "Constant",
+            "name": "Constant",
+            "parent": "bms_master/ EKF_SoC_Estimator"
+          },
+          {
+            "path": "bms_master/Current_Monitor/Gain",
+            "type": "Gain",
+            "name": "Gain",
+            "parent": "bms_master/Current_Monitor"
+          },
+          {
+            "path": "bms_master/Current_Monitor/Gain1",
+            "type": "Gain",
+            "name": "Gain1",
+            "parent": "bms_master/Current_Monitor"
+          },
+          {
+            "path": "bms_master/Current_Monitor/Gain2",
+            "type": "Gain",
+            "name": "Gain2",
+            "parent": "bms_master/Current_Monitor"
+          },
+          {
+            "path": "bms_master/Current_Monitor/Switch",
+            "type": "Switch",
+            "name": "Switch",
+            "parent": "bms_master/Current_Monitor"
+          },
+          {
+            "path": "bms_master/Current_Monitor/Switch1",
+            "type": "Switch",
+            "name": "Switch1",
+            "parent": "bms_master/Current_Monitor"
+          },
+          {
+            "path": "bms_master/Current_Monitor/Switch2",
+            "type": "Switch",
+            "name": "Switch2",
+            "parent": "bms_master/Current_Monitor"
+          },
+          {
+            "path": "bms_master/Fault_Debounce/Constant",
+            "type": "Constant",
+            "name": "Constant",
+            "parent": "bms_master/Fault_Debounce"
+          },
+          {
+            "path": "bms_master/Fault_Debounce/Constant1",
+            "type": "Constant",
+            "name": "Constant1",
+            "parent": "bms_master/Fault_Debounce"
+          },
+          {
+            "path": "bms_master/Fault_Debounce/Constant2",
+            "type": "Constant",
+            "name": "Constant2",
+            "parent": "bms_master/Fault_Debounce"
+          },
+          {
+            "path": "bms_master/Fault_Debounce/Temp_Logic/Gain",
+            "type": "Gain",
+            "name": "Gain",
+            "parent": "bms_master/Fault_Debounce/Temp_Logic"
+          },
+          {
+            "path": "bms_master/Fault_Debounce/Temp_Logic/Gain1",
+            "type": "Gain",
+            "name": "Gain1",
+            "parent": "bms_master/Fault_Debounce/Temp_Logic"
+          },
+          {
+            "path": "bms_master/Fault_Debounce/Temp_Logic1/Gain",
+            "type": "Gain",
+            "name": "Gain",
+            "parent": "bms_master/Fault_Debounce/Temp_Logic1"
+          },
+          {
+            "path": "bms_master/Fault_Debounce/Temp_Logic1/Gain1",
+            "type": "Gain",
+            "name": "Gain1",
+            "parent": "bms_master/Fault_Debounce/Temp_Logic1"
+          },
+          {
+            "path": "bms_master/Fault_Debounce/Volt_Curr_Logic/Gain",
+            "type": "Gain",
+            "name": "Gain",
+            "parent": "bms_master/Fault_Debounce/Volt_Curr_Logic"
+          }
+        ],
+        "default_named_by_parent_list": [
+          {
+            "parent": "bms_master/ EKF_SoC_Estimator",
+            "count": 1,
+            "names": "Constant",
+            "types": "Constant"
+          },
+          {
+            "parent": "bms_master/Current_Monitor",
+            "count": 6,
+            "names": "Gain, Gain1, Gain2, Switch, Switch1, Switch2",
+            "types": "Gain/Switch"
+          },
+          {
+            "parent": "bms_master/Fault_Debounce",
+            "count": 3,
+            "names": "Constant, Constant1, Constant2",
+            "types": "Constant"
+          },
+          {
+            "parent": "bms_master/Fault_Debounce/Temp_Logic",
+            "count": 2,
+            "names": "Gain, Gain1",
+            "types": "Gain"
+          },
+          {
+            "parent": "bms_master/Fault_Debounce/Temp_Logic1",
+            "count": 2,
+            "names": "Gain, Gain1",
+            "types": "Gain"
+          },
+          {
+            "parent": "bms_master/Fault_Debounce/Volt_Curr_Logic",
+            "count": 1,
+            "names": "Gain",
+            "types": "Gain"
+          }
+        ],
+        "algebraic_loops_list": [],
+        "blocks_by_type": {
+          "Inport": 125,
+          "Outport": 113,
+          "Constant": 74,
+          "SubSystem": 64,
+          "RelationalOperator": 45,
+          "Sum": 21,
+          "Switch": 19,
+          "Gain": 17,
+          "MinMax": 17,
+          "DataTypeConversion": 14,
+          "UnitDelay": 14,
+          "Product": 6
+        }
+      },
+      "stateflow": {
+        "chart_count": 1,
+        "state_count": 4,
+        "transition_count": 8,
+        "junction_count": 0,
+        "charts": {
+          "name": "Fault_Severity_FSM",
+          "path": "bms_master/Fault_Severity_FSM/Fault_Severity_FSM",
+          "states": 4,
+          "transitions": 8,
+          "junctions": 0
+        }
+      },
+      "solver": {
+        "solvertype": "Fixed-step",
+        "solver": "FixedStepDiscrete",
+        "fixedstep": "0.1",
+        "starttime": "0.0",
+        "stoptime": "T_stop",
+        "sample_times": 0.1,
+        "distinct_rates": 1,
+        "fundamental_step": 0.1
+      },
+      "codegen": {
+        "present": true,
+        "root": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\bms_master_ert_rtw",
+        "n_c_files": 3,
+        "n_h_files": 5,
+        "loc_total": 4009,
+        "loc_main_c": 676
+      },
+      "signals": {
+        "unnamed_inter_subsys_list": [],
+        "total_lines": 633,
+        "unnamed_count": 0
+      },
+      "rates": {
+        "distinct_rates": 1,
+        "sample_time_set": "0.1",
+        "rate_transition_blocks": 0,
+        "missing_rate_transitions": []
+      },
+      "data": {
+        "magic_constants_list": [
+          {
+            "path": "bms_master/ EKF_SoC_Estimator/Constant",
+            "value": "96",
+            "parent": "bms_master/ EKF_SoC_Estimator"
+          },
+          {
+            "path": "bms_master/Power_Limiter/P_base/Constant",
+            "value": "96",
+            "parent": "bms_master/Power_Limiter/P_base"
+          },
+          {
+            "path": "bms_master/Slave_Watchdog/Watchdog_Severity/Constant4",
+            "value": "2",
+            "parent": "bms_master/Slave_Watchdog/Watchdog_Severity"
+          },
+          {
+            "path": "bms_master/Slave_Watchdog/Watchdog_Severity/Constant5",
+            "value": "3",
+            "parent": "bms_master/Slave_Watchdog/Watchdog_Severity"
+          }
+        ],
+        "data_store_globals_list": [],
+        "goto_global_list": []
+      },
+      "codeblock": {
+        "matlab_function_blocks_list": [
+          {
+            "path": "bms_master/ EKF_SoC_Estimator/MATLAB Function",
+            "loc": 59,
+            "max_nesting": 0,
+            "name": "MATLAB Function"
+          },
+          {
+            "path": "bms_master/SoH_Estimator/MATLAB Function",
+            "loc": 41,
+            "max_nesting": 0,
+            "name": "MATLAB Function"
+          },
+          {
+            "path": "bms_master/Signal_Aggregator/Decode_Fault_Flags/decode_bits",
+            "loc": 7,
+            "max_nesting": 0,
+            "name": "decode_bits"
+          }
+        ]
+      }
+    }
+  },
+  "links": {
+    "requirements": "validator/requirements/requirements.json",
+    "cov_report": "validator/reports/COV.json",
+    "mil_report": "validator/reports/MIL.json",
+    "sil_report": "validator/reports/SIL.json",
+    "pil_report": "validator/reports/PIL.json"
+  }
+}

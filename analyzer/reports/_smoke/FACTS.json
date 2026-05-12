@@ -1,0 +1,200 @@
+{
+    "schema_version":  "1.0",
+    "timestamp":  "smoke",
+    "scope":  [
+                  "bms_master",
+                  "bms_slave",
+                  "fault_predictor"
+              ],
+    "models":  {
+                   "bms_master":  {
+                                      "static":  {
+                                                     "block_count":  220,
+                                                     "subsystem_count":  30,
+                                                     "atomic_count":  8,
+                                                     "depth_max":  9,
+                                                     "signal_lines":  400,
+                                                     "cyclomatic":  80,
+                                                     "unconnected_ports":  2,
+                                                     "broken_links":  1,
+                                                     "unconnected_ports_list":  [
+                                                                                    {
+                                                                                        "path":  "bms_master/Signal_Aggregator/Decode_Fault_Flags/Logical Operator",
+                                                                                        "type":  "Inport",
+                                                                                        "port":  2,
+                                                                                        "parent":  "bms_master/Signal_Aggregator/Decode_Fault_Flags",
+                                                                                        "block_type":  "Logic"
+                                                                                    },
+                                                                                    {
+                                                                                        "path":  "bms_master/Protection/Contactor_Logic/Switch",
+                                                                                        "type":  "Outport",
+                                                                                        "port":  1,
+                                                                                        "parent":  "bms_master/Protection/Contactor_Logic",
+                                                                                        "block_type":  "Switch"
+                                                                                    }
+                                                                                ],
+                                                     "broken_links_list":  [
+                                                                               {
+                                                                                   "path":  "bms_master/Library_Wrappers/CellLib_Adapter",
+                                                                                   "status":  "unresolved"
+                                                                               }
+                                                                           ],
+                                                     "large_subsystems_list":  [
+                                                                                   {
+                                                                                       "path":  "bms_master/Estimation/SOC_Estimator",
+                                                                                       "n_blocks":  145,
+                                                                                       "atomic":  true
+                                                                                   }
+                                                                               ],
+                                                     "deep_blocks_list":  [
+                                                                              {
+                                                                                  "path":  "bms_master/L1/L2/L3/L4/L5/L6/L7/L8/L9/Const",
+                                                                                  "depth":  9
+                                                                              }
+                                                                          ],
+                                                     "default_named_blocks_list":  [
+                                                                                       {
+                                                                                           "path":  "bms_master/Estimation/Gain1",
+                                                                                           "type":  "Gain",
+                                                                                           "name":  "Gain1",
+                                                                                           "parent":  "bms_master/Estimation"
+                                                                                       },
+                                                                                       {
+                                                                                           "path":  "bms_master/Protection/Sum2",
+                                                                                           "type":  "Sum",
+                                                                                           "name":  "Sum2",
+                                                                                           "parent":  "bms_master/Protection"
+                                                                                       }
+                                                                                   ],
+                                                     "high_cyclo_subsystems_list":  [
+                                                                                        {
+                                                                                            "path":  "bms_master/Protection/Fault_Manager",
+                                                                                            "value":  47
+                                                                                        }
+                                                                                    ],
+                                                     "algebraic_loops_list":  [
+                                                                                  {
+                                                                                      "path":  "bms_master/Estimation/SOC_Loop"
+                                                                                  }
+                                                                              ]
+                                                 },
+                                      "stateflow":  {
+                                                        "chart_count":  1,
+                                                        "state_count":  55,
+                                                        "transition_count":  80,
+                                                        "junction_count":  4,
+                                                        "charts":  [
+                                                                       {
+                                                                           "name":  "Master_FSM",
+                                                                           "path":  "bms_master/Mode_Manager/Master_FSM",
+                                                                           "states":  55,
+                                                                           "transitions":  80,
+                                                                           "junctions":  4
+                                                                       }
+                                                                   ]
+                                                    },
+                                      "solver":  {
+                                                     "distinct_rates":  5
+                                                 },
+                                      "codegen":  {
+                                                      "present":  true
+                                                  }
+                                  },
+                   "bms_slave":  {
+                                     "static":  {
+                                                    "block_count":  90,
+                                                    "depth_max":  4,
+                                                    "cyclomatic":  18,
+                                                    "unconnected_ports":  1,
+                                                    "broken_links":  0,
+                                                    "unconnected_ports_list":  [
+                                                                                   {
+                                                                                       "path":  "bms_slave/Comm/RX_Decoder/Demux",
+                                                                                       "type":  "Outport",
+                                                                                       "port":  3,
+                                                                                       "parent":  "bms_slave/Comm/RX_Decoder",
+                                                                                       "block_type":  "Demux"
+                                                                                   }
+                                                                               ],
+                                                    "broken_links_list":  [
+
+                                                                          ],
+                                                    "large_subsystems_list":  [
+
+                                                                              ],
+                                                    "deep_blocks_list":  [
+
+                                                                         ],
+                                                    "default_named_blocks_list":  [
+
+                                                                                  ],
+                                                    "high_cyclo_subsystems_list":  [
+
+                                                                                   ],
+                                                    "algebraic_loops_list":  [
+
+                                                                             ]
+                                                },
+                                     "stateflow":  {
+                                                       "chart_count":  0,
+                                                       "state_count":  0,
+                                                       "transition_count":  0,
+                                                       "junction_count":  0,
+                                                       "charts":  [
+
+                                                                  ]
+                                                   },
+                                     "solver":  {
+                                                    "distinct_rates":  1
+                                                },
+                                     "codegen":  {
+                                                     "present":  true
+                                                 }
+                                 },
+                   "fault_predictor":  {
+                                           "static":  {
+                                                          "block_count":  18,
+                                                          "depth_max":  2,
+                                                          "cyclomatic":  2,
+                                                          "unconnected_ports":  0,
+                                                          "broken_links":  0,
+                                                          "unconnected_ports_list":  [
+
+                                                                                     ],
+                                                          "broken_links_list":  [
+
+                                                                                ],
+                                                          "large_subsystems_list":  [
+
+                                                                                    ],
+                                                          "deep_blocks_list":  [
+
+                                                                               ],
+                                                          "default_named_blocks_list":  [
+
+                                                                                        ],
+                                                          "high_cyclo_subsystems_list":  [
+
+                                                                                         ],
+                                                          "algebraic_loops_list":  [
+
+                                                                                   ]
+                                                      },
+                                           "stateflow":  {
+                                                             "chart_count":  0,
+                                                             "state_count":  0,
+                                                             "transition_count":  0,
+                                                             "junction_count":  0,
+                                                             "charts":  [
+
+                                                                        ]
+                                                         },
+                                           "solver":  {
+                                                          "distinct_rates":  1
+                                                      },
+                                           "codegen":  {
+                                                           "present":  false
+                                                       }
+                                       }
+               }
+}

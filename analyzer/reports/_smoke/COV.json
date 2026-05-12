@@ -1,0 +1,128 @@
+{
+    "timestamp":  "smoke",
+    "suite":  "cov",
+    "scope":  [
+                  "bms_master",
+                  "bms_slave",
+                  "fault_predictor"
+              ],
+    "summary":  {
+                    "total":  1,
+                    "pass":  1,
+                    "fail":  0,
+                    "error":  0,
+                    "skipped":  0
+                },
+    "by_model":  {
+                     "bms_master":  {
+                                        "execution":  {
+                                                          "covered":  215,
+                                                          "total":  216,
+                                                          "coverage_pct":  99.5,
+                                                          "dead_pct":  0.5
+                                                      },
+                                        "decision":  {
+                                                         "covered":  1017,
+                                                         "total":  1046,
+                                                         "coverage_pct":  97.2,
+                                                         "dead_pct":  2.8
+                                                     },
+                                        "condition":  {
+                                                          "covered":  825,
+                                                          "total":  834,
+                                                          "coverage_pct":  98.9,
+                                                          "dead_pct":  1.1
+                                                      },
+                                        "mcdc":  {
+                                                     "covered":  4,
+                                                     "total":  41,
+                                                     "coverage_pct":  9.8,
+                                                     "dead_pct":  90.2
+                                                 },
+                                        "uncovered_blocks":  [
+                                                                 {
+                                                                     "path":  "bms_master/Estimation/SOC_Estimator/Branch_If_Empty",
+                                                                     "metric":  "execution",
+                                                                     "hit":  0,
+                                                                     "total":  1,
+                                                                     "parent":  "bms_master/Estimation/SOC_Estimator",
+                                                                     "block_type":  "If"
+                                                                 },
+                                                                 {
+                                                                     "path":  "bms_master/Protection/OverV_Trip",
+                                                                     "metric":  "decision",
+                                                                     "hit":  1,
+                                                                     "total":  2,
+                                                                     "parent":  "bms_master/Protection",
+                                                                     "block_type":  "Switch"
+                                                                 },
+                                                                 {
+                                                                     "path":  "bms_master/Protection/UnderV_Trip",
+                                                                     "metric":  "decision",
+                                                                     "hit":  1,
+                                                                     "total":  2,
+                                                                     "parent":  "bms_master/Protection",
+                                                                     "block_type":  "Switch"
+                                                                 }
+                                                             ]
+                                    },
+                     "bms_slave":  {
+                                       "execution":  {
+                                                         "covered":  90,
+                                                         "total":  90,
+                                                         "coverage_pct":  100,
+                                                         "dead_pct":  0
+                                                     },
+                                       "decision":  {
+                                                        "covered":  50,
+                                                        "total":  50,
+                                                        "coverage_pct":  100,
+                                                        "dead_pct":  0
+                                                    },
+                                       "condition":  {
+                                                         "covered":  40,
+                                                         "total":  40,
+                                                         "coverage_pct":  100,
+                                                         "dead_pct":  0
+                                                     },
+                                       "mcdc":  {
+                                                    "covered":  5,
+                                                    "total":  5,
+                                                    "coverage_pct":  100,
+                                                    "dead_pct":  0
+                                                },
+                                       "uncovered_blocks":  [
+
+                                                            ]
+                                   },
+                     "fault_predictor":  {
+                                             "execution":  {
+                                                               "covered":  18,
+                                                               "total":  18,
+                                                               "coverage_pct":  100,
+                                                               "dead_pct":  0
+                                                           },
+                                             "decision":  {
+                                                              "covered":  0,
+                                                              "total":  0,
+                                                              "coverage_pct":  100,
+                                                              "dead_pct":  0
+                                                          },
+                                             "condition":  {
+                                                               "covered":  0,
+                                                               "total":  0,
+                                                               "coverage_pct":  100,
+                                                               "dead_pct":  0
+                                                           },
+                                             "mcdc":  {
+                                                          "covered":  0,
+                                                          "total":  0,
+                                                          "coverage_pct":  100,
+                                                          "dead_pct":  0
+                                                      },
+                                             "uncovered_blocks":  [
+
+                                                                  ]
+                                         }
+                 }
+}

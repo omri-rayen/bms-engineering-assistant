@@ -1,0 +1,536 @@
+================================================================================
+ ROADMAP — Analysis Module (smart-assistant software level, V-model)
+================================================================================
+Authored      : 2026-05-09
+Module name   : analyzer/
+Position      : sibling to validator/ ; second software-level module after
+                validator (model-side), built per V-model (req -> sw design ->
+                module design -> dev -> unit test -> integration -> acceptance).
+
+Purpose       : Two coupled functionalities
+                  F1. STATIC MODEL METRICS COLLECTION (MATLAB-side)
+                      Deeply scrape bms_master / bms_slave / fault_predictor
+                      via Simulink + Model Advisor APIs.
+                  F2. AI EXPERT SYSTEM (Python-side)
+                      Forward-chaining rule engine over the metrics + the
+                      validator's COV/MIL/SIL/PIL JSON reports.
+                      Produces interpretations + recommendations as JSON,
+                      with an explanation trace (which rules fired, in what
+                      order, on which facts).
+
+Out-of-scope here :
+                - Active model edits / repairs (assistant is informational).
+                - LLM / embeddings / RAG. We stay symbolic (rule-based) per
+                  user constraint "simple, clean, efficient, NOT complex".
+                - Plant model coverage / interpretation (smart BMS only).
+                - Generated-C dead code (left to a future C-coverage tool).
+
+Standards used in the rule base :
+                - ISO 26262 part 6 (model-based dev tables 1, 4, 7-10)
+                  and the implicit ASIL gating of dead code.
+                - MathWorks MAAB / "Modeling Guidelines for High-Integrity
+                  Systems" (the Model Advisor "MAB" + "hisl_*" check sets).
+
+
+--------------------------------------------------------------------------------
+ 1. Design decisions captured from the clarification round (2026-05-09)
+--------------------------------------------------------------------------------
+D1. Hybrid runtime  : MATLAB collects facts -> JSON ; Python runs the rules.
+D2. Engine          : hand-rolled forward-chaining (~150-200 LoC), zero deps
+                      except PyYAML + (optional) jsonschema.
+D3. Module location : analyzer/ at repo root.
+D4. COV enrichment  : extend validator/cov/+cov/run.m to also dump a per-
+                      uncovered-element list (it's already in §4 of
+                      validator/cov/ROADMAP.txt but was never implemented).
+                      No new packages, just one extra helper next to
+                      cov.collect.
+D5. ASIL source     : add an "asil" field to each low-level requirement in
+                      validator/requirements/requirements.json. Single source
+                      of truth ; no separate map file to keep in sync.
+                      Proposed defaults below ; user confirms during impl.
+D6. Knowledge base  : declarative YAML, one file per category :
+                        analyzer/knowledge/dead_code.yaml
+                        analyzer/knowledge/model_arch.yaml
+                        analyzer/knowledge/maab.yaml
+                        analyzer/knowledge/iso26262.yaml
+                        analyzer/knowledge/asil_policy.yaml
+D7. Models in scope : bms_master, bms_slave, fault_predictor (= COV scope).
+D8. Static metrics  : block counts, hierarchy depth, cyclomatic complexity,
+                      signal/port hygiene, Stateflow metrics, model refs,
+                      solver/sample-time, MAAB via ModelAdvisor, data
+                      dictionary / bus usage, generated-C LoC.
+
+
+--------------------------------------------------------------------------------
+ 2. Files to create   (NOTHING outside analyzer/ + 2 surgical edits below)
+--------------------------------------------------------------------------------
+analyzer/
+  ROADMAP.txt                               <-- this file
+  README.md                                 short usage doc (impl phase)
+  +ana/                                     MATLAB package, mirrors +mil/+sil
+    collect.m                               main entry  ana.collect
+    metrics_static.m                        find_system + Simulink.MDLInfo
+    metrics_stateflow.m                     Stateflow.* APIs
+    metrics_solver.m                        get_param solver/sample-time
+    metrics_advisor.m                       ModelAdvisor.run, MAAB result
+    metrics_codegen.m                       walks bms_master_ert_rtw/*.c
+    facts_writer.m                          merges all -> facts JSON
+  python/
+    analyzer/
+      __init__.py
+      cli.py                                python -m analyzer  entry
+      facts.py                              load+merge facts + report JSONs
+      engine.py                             forward-chaining + trace
+      rules.py                              YAML loader -> Rule objects
+      reporter.py                           writes interpretations JSON
+      schemas/
+        facts.schema.json
+        report.schema.json
+    pyproject.toml                          (or requirements.txt only)
+  knowledge/
+    dead_code.yaml
+    model_arch.yaml
+    maab.yaml
+    iso26262.yaml
+    asil_policy.yaml
+  reports/                                  output JSONs (gitkeep)
+    .gitkeep
+  tests/
+    matlab/                                 unit tests for ana.* (val.* style)
+      test_metrics_static.m
+      test_metrics_advisor.m
+    python/
+      test_engine.py                        pytest
+      test_rules_dead_code.py
+      test_explain_trace.py
+
+Two surgical edits in existing code (impl phase, NOT done in this roadmap) :
+  E1. validator/cov/+cov/run.m + new validator/cov/+cov/uncovered.m
+      to dump uncovered: [{model, path, metric, branch, condition, asil_hint}]
+      into COV.json. Backwards compatible (purely additive field).
+  E2. validator/requirements/requirements.json
+      add "asil": "<A|B|C|D|QM>" to each REQ-LL-* entry.
+      Proposed defaults (user to confirm) :
+        VMON-01/02   C    (over/under-voltage: thermal runaway path)
+        TMON-01/02   C
+        IMON-01/02   C
+        FSM-01       D    (gates everything)
+        SOC-01       B
+        SOH-01       A
+        BAL-01/02    A
+        THM-01       B
+        PWR-01       C    (limits torque request)
+        WDG-01       C
+        HWP-01       D    (last-line HW protection)
+        PRD-LT-01..03, DR-01, FAR-01   QM (informational predictor)
+        SIL-EQ-01    inherits worst REQ in scope = D
+        RT-WCET-01   C
+        RT-RAM-01    B
+        PIL-PRD-01   QM
+        COV-DEAD-01  inherits worst BMS REQ = D
+        PLT-*        QM (plant fidelity, no safety claim)
+
+
+--------------------------------------------------------------------------------
+ 3. Functionality F1 -- Static metrics collection (MATLAB)
+--------------------------------------------------------------------------------
+Entry point :
+    facts = ana.collect                          % defaults
+    facts = ana.collect('models',{'bms_master'}) % subset
+    ana.collect('outFile','analyzer/reports/FACTS_<ts>.json')
+
+Pipeline per model in scope :
+
+  S1. load_system + handle keep
+  S2. metrics_static :
+        - blocks_by_type   = countcats(categorical(get_param(blks,'BlockType')))
+        - depth_max        = max levels under root  (find_system 'LookUnderMasks','all')
+        - subsystem_count, atomic_subsys_count
+        - cyclomatic       = sldiagnostics(mdl,'CyclomaticComplexity')
+        - signal_lines     = numel(find_system(mdl,'FindAll','on','Type','Line'))
+        - unconnected_ports= numel(find_system(mdl,'FindAll','on',...
+                                'Type','Port','Line',-1))   (heuristic)
+        - algebraic_loops  = sldiagnostics(mdl,'AlgebraicLoops')
+        - model_refs       = find_mdlrefs(mdl,'AllLevels',true)
+        - lib_links        = libinfo(mdl)
+  S3. metrics_stateflow :
+        - charts, states, transitions, junctions per chart
+          via Stateflow.Root + .find('-isa','Stateflow.Chart')
+  S4. metrics_solver :
+        - SolverType, FixedStep, SampleTime, FundamentalSampleTime
+        - get_param(mdl,'CompiledSampleTime')  after a fast compile
+  S5. metrics_advisor :
+        - ModelAdvisor.run(mdl,{'maab','hisl_do178'}) ; parse JSON output
+          into a flat list of {check_id, severity, blocks_failing}
+        - cache to slprj/modeladvisor cache so re-runs are fast
+  S6. metrics_codegen (only when bms_master_ert_rtw/ exists) :
+        - LoC per .c/.h, function count, includes graph
+  S7. facts_writer assembles into one JSON :
+
+    {
+      "schema_version": "1.0",
+      "timestamp"     : "...",
+      "scope"         : ["bms_master", "bms_slave", "fault_predictor"],
+      "models" : {
+        "bms_master" : {
+          "static"    : {...},
+          "stateflow" : {...},
+          "solver"    : {...},
+          "advisor"   : { "checks": [ {id,severity,n_failing,blocks:[...]} ] },
+          "codegen"   : {...}
+        }, ...
+      },
+      "links" : {
+        "requirements" : "validator/requirements/requirements.json",
+        "cov_report"   : "validator/reports/COV.json",
+        "mil_report"   : "validator/reports/MIL.json",
+        "sil_report"   : "validator/reports/SIL.json",
+        "pil_report"   : "validator/reports/PIL.json"
+      }
+    }
+
+  Output : analyzer/reports/FACTS_<timestamp>.json + sticky FACTS.json.
+
+  Acceptance F1 :
+    A1. ana.collect runs in <= 60 s warm on the unmodified repo.
+    A2. Schema validates against analyzer/python/schemas/facts.schema.json
+        (CI check, see §6).
+    A3. No edits to .slx files. No leftover Coverage flags. Models closed
+        clean (dirty flag preserved).
+
+
+--------------------------------------------------------------------------------
+ 4. Functionality F2 -- AI Expert System (Python)
+--------------------------------------------------------------------------------
+Architecture (4 standard ES components) :
+
+  +-------------------+    +------------------+    +------------------+
+  | facts.py          | -> | engine.py        | -> | reporter.py      |
+  | (working memory)  |    | (inference)      |    | (interpretation +|
+  |  facts.json       |    |  forward-chain   |    |  recommendations)|
+  |  COV/MIL/SIL/PIL  |    |  + trace         |    |  -> JSON         |
+  |  requirements.json|    |                  |    +------------------+
+  +-------------------+    +------------------+
+                              ^         |
+                              |         v
+                       +------+------+  +-----------------+
+                       | rules.py    |  | explanation     |
+                       | (YAML KB)   |  | facility        |
+                       | dead_code   |  |  why? + rule    |
+                       | model_arch  |  |  trace          |
+                       | maab        |  +-----------------+
+                       | iso26262    |
+                       | asil_policy |
+                       +-------------+
+
+CLI :
+    python -m analyzer            \
+        --facts   analyzer/reports/FACTS.json   \
+        --cov     validator/reports/COV.json    \
+        --mil     validator/reports/MIL.json    \
+        --sil     validator/reports/SIL.json    \
+        --pil     validator/reports/PIL.json    \
+        --reqs    validator/requirements/requirements.json \
+        --kb      analyzer/knowledge/           \
+        --out     analyzer/reports/ANALYSIS_<ts>.json
+
+  All paths default to the canonical locations above when omitted.
+
+
+4.1  FACT BASE (working memory)
+-------------------------------
+Loaded once at startup as a single nested dict :
+
+    facts = {
+      "model"         : <FACTS.json>.models,
+      "coverage"      : <COV.json>,
+      "mil"           : <MIL.json>,
+      "sil"           : <SIL.json>,
+      "pil"           : <PIL.json>,
+      "requirements"  : { "<REQ-ID>": {component, function, asil, phases, ...} }
+    }
+
+The engine never mutates `facts`. New conclusions go into a separate
+`derived` dict so the trace is reproducible.
+
+
+4.2  KNOWLEDGE BASE  (~30-50 rules total, ~5-10 per YAML file)
+--------------------------------------------------------------
+Each rule (YAML) :
+
+    - id        : DC-MASTER-MCDC-HIGH
+      category  : dead_code
+      premise   : >
+          coverage.by_model.bms_master.mcdc.dead_pct > 50
+      bind      :
+          model     : bms_master
+          dead_pct  : coverage.by_model.bms_master.mcdc.dead_pct
+      reasoning : >
+          High MCDC dead percentage on a safety-relevant model means
+          test stimuli do not exercise enough independent input
+          combinations on multi-condition decisions.
+      conclusion :
+          severity        : "{{ asil_severity('bms', 'mcdc', dead_pct) }}"
+          finding         : "bms_master MCDC dead = {{ dead_pct|round(1) }}%"
+      recommendation :
+          - "Add MIL stimuli that toggle each input of multi-AND/OR
+             gates independently, in particular Balancing_Arbitrator/
+             Logical Operator1 (4-input AND, 0/32 MCDC)."
+          - "Document and accept residual MCDC gap with ISO 26262
+             part 6 §9.4.5 rationale (structurally infeasible)."
+      iso_refs   : ["ISO 26262-6:2018, table 7, MC/DC"]
+
+Premises are restricted to a tiny safe expression language :
+    - dotted-path facts lookup       coverage.by_model.X.Y.Z
+    - comparisons, and/or/not, in
+    - helper fns   asil_of(req_id), asil_severity(component, metric, value)
+                   contains_block(model, name), uncovered_in(model, subsys)
+NO eval(), NO arbitrary Python in YAML.
+
+Rule categories (initial set) :
+
+  dead_code.yaml     ~10 rules
+    - DC-EXEC-NONZERO        any model exec dead > 0  -> CRITICAL if ASIL>=C
+    - DC-DEC-HIGH            decision dead > threshold
+    - DC-COND-HIGH           condition dead > threshold
+    - DC-MCDC-HIGH           mcdc dead > threshold (split by component ASIL)
+    - DC-MCDC-PROTECTIVE     mcdc-only on guarded protective branches ->
+                             accept with rationale (ISO 26262-6 §9.4.5)
+    - DC-FN-VMON / DC-FN-FSM / DC-FN-HWP   per-function dead branches map
+                             to specific REQ ASIL via 'function' tag
+    - DC-PREDICTOR-COND      fault_predictor cond dead    (informational only)
+
+  model_arch.yaml    ~8 rules
+    - ARCH-DEPTH-DEEP        hierarchy depth > 6
+    - ARCH-CYCLOMATIC-HIGH   cyclomatic > 50 in any subsystem
+    - ARCH-UNCONNECTED       any unconnected port
+    - ARCH-ALG-LOOP          algebraic loop present
+    - ARCH-LIB-DRIFT         broken library link
+    - ARCH-MULTIRATE         > 3 distinct sample times in bms_master
+    - ARCH-LARGE-SUBSYS      atomic subsys with > 100 blocks
+    - ARCH-STATEFLOW-COMPLEX states+transitions > 40 in one chart
+
+  maab.yaml          ~10 rules (one per MAAB family we care about)
+    - MAAB-NAMING            jc_*  failures on signal/block naming
+    - MAAB-READABILITY       db_*  font/colors/labels
+    - MAAB-DATA              jm_*  data store hygiene
+    - MAAB-CONSTRUCTS        jc_0247 etc on switch/if usage
+    - MAAB-STATEFLOW         db_*  stateflow naming + transitions
+    - severity mapped from advisor.checks[*].severity
+
+  iso26262.yaml      ~6 rules (cross-cutting)
+    - ISO-TBL7-MCDC          require MC/DC for ASIL D unless rationale
+    - ISO-TBL7-EXEC          execution coverage 100% for ASIL >= B
+    - ISO-TBL10-DC           decision coverage 100% for ASIL D
+    - ISO-PART9-FREEDOM      data/control coupling notes for HW_Protection
+    - ISO-PART6-SOTIF        predictor (QM) must not affect safety path
+
+  asil_policy.yaml   thresholds table (data, not rules)
+    asil_thresholds:
+      D : { exec_dead: 0,   dec_dead: 0,   cond_dead: 0,    mcdc_dead: 0   }
+      C : { exec_dead: 0,   dec_dead: 1,   cond_dead: 5,    mcdc_dead: 50  }
+      B : { exec_dead: 0,   dec_dead: 5,   cond_dead: 10,   mcdc_dead: 75  }
+      A : { exec_dead: 0,   dec_dead: 10,  cond_dead: 20,   mcdc_dead: 100 }
+      QM: { exec_dead: 5,   dec_dead: 25,  cond_dead: 50,   mcdc_dead: 100 }
+
+
+4.3  INFERENCE ENGINE  (engine.py, ~120 LoC)
+---------------------------------------------
+Forward chaining, fixed-point iteration :
+
+    derived = {}
+    trace   = []
+    fired   = set()
+    changed = True
+    while changed:
+        changed = False
+        for r in rules_sorted_by_category_then_id:
+            if r.id in fired: continue
+            ctx = eval_premise(r.premise, facts, derived)
+            if ctx is None: continue          # premise false
+            out = render_conclusion(r, ctx)
+            derived.setdefault(r.category, []).append(out)
+            trace.append({
+              "rule_id"      : r.id,
+              "rule_name"    : r.name,
+              "premise_eval" : ctx.bindings,
+              "facts_used"   : ctx.facts_paths,   # auto-recorded by lookup
+              "conclusion"   : out,
+              "iso_refs"     : r.iso_refs,
+            })
+            fired.add(r.id)
+            changed = True
+
+Determinism : rules sorted lexicographically per category for reproducible
+trace order. Engine is single-pass per rule (no cycle), but the loop
+repeats so that rules whose premise depends on a derived fact (rare, but
+e.g. ISO-TBL7-MCDC depends on the dead_code findings) can fire on a
+later pass.
+
+
+4.4  EXPLANATION FACILITY
+--------------------------
+Each output finding includes the trace entry that produced it.  Three
+canonical questions are answerable directly from the JSON :
+
+  Q1. WHY this finding ?       -> trace[i].premise_eval + facts_used
+  Q2. WHICH rules fired ?      -> trace (ordered)
+  Q3. HOW was it derived ?     -> trace shows category, rule deps, ISO refs
+
+Engine also exposes :
+    why(finding_id)       -> dict
+    chain_for(rule_id)    -> ordered list of rules that contributed facts
+                             to this rule's premise
+
+
+4.5  OUTPUT JSON  (analyzer/reports/ANALYSIS_<ts>.json)
+-------------------------------------------------------
+
+    {
+      "schema_version": "1.0",
+      "timestamp"     : "...",
+      "inputs" : {
+        "facts" : "analyzer/reports/FACTS.json#<sha256>",
+        "cov"   : "validator/reports/COV.json#<sha256>",
+        "mil"   : "...",
+        "sil"   : "...",
+        "pil"   : "...",
+        "reqs"  : "..."
+      },
+      "summary" : {
+        "n_findings"         : 7,
+        "by_severity"        : { "critical": 1, "major": 2, "minor": 3, "info": 1 },
+        "by_category"        : { "dead_code": 3, "model_arch": 2, "maab": 1, "iso26262": 1 },
+        "verdict"            : "review_required" | "ok" | "blocking"
+      },
+      "findings" : [
+        {
+          "id"              : "F-001",
+          "rule_id"         : "DC-MCDC-HIGH",
+          "category"        : "dead_code",
+          "severity"        : "major",
+          "subject"         : { "model":"bms_master", "function":"balancing" },
+          "asil"            : "A",
+          "finding"         : "bms_master MCDC dead = 90.2%",
+          "reasoning"       : "...",
+          "recommendation"  : ["Add MIL stimuli that ...", "Document and accept ..."],
+          "iso_refs"        : ["ISO 26262-6:2018, table 7, MC/DC"],
+          "evidence"        : {
+            "facts_used"    : ["coverage.by_model.bms_master.mcdc.dead_pct"],
+            "values"        : { "dead_pct": 90.24 }
+          }
+        }, ...
+      ],
+      "trace" : [ ... full ordered trace, see §4.3 ... ]
+    }
+
+
+--------------------------------------------------------------------------------
+ 5. End-to-end flow  (one campaign)
+--------------------------------------------------------------------------------
+   MATLAB                                  Python
+   ------                                  ------
+   mil.plant_convergence
+   mil.run            -> MIL.json
+   sil.run            -> SIL.json
+   pil.run            -> PIL.json
+   cov.run            -> COV.json (now with 'uncovered' list)
+   ana.collect        -> FACTS.json
+                         |
+                         v
+                                       python -m analyzer
+                                         -> ANALYSIS_<ts>.json
+                                            + sticky ANALYSIS.json
+
+A new top-level helper run_full_pipeline.m (already exists at root) is
+extended in the impl phase to call ana.collect after cov.run, and to
+shell out to `python -m analyzer` if Python is on PATH (skipped silently
+if not, with a warning).
+
+
+--------------------------------------------------------------------------------
+ 6. V-model artefacts for analyzer/  (per user constraint: V-model)
+--------------------------------------------------------------------------------
+Each of these is a 1-pager kept beside the code, NOT a heavyweight doc :
+
+  R  Requirement spec  : analyzer/docs/REQ.md
+                         REQ-AN-* IDs covering F1, F2, output schema, ASIL
+                         gating, explainability, perf budget.
+  SD Software design   : analyzer/docs/DESIGN.md  (this roadmap is the seed)
+  MD Module design     : per-file docstring at the top of each .m / .py
+  IM Implementation    : the code itself
+  UT Unit tests        : analyzer/tests/{matlab,python}/  (per-function)
+  IT Integration tests : analyzer/tests/python/test_e2e.py
+                         runs ana.collect on a frozen mini-model snapshot,
+                         asserts ANALYSIS.json schema + at least one
+                         expected finding (e.g. DC-MCDC-HIGH on bms_master).
+  AT Acceptance test   : analyzer/tests/acceptance.py
+                         injects a known dead block in a sandbox copy of
+                         bms_slave, asserts severity == critical for an
+                         ASIL>=C function ; restores model on teardown.
+
+Schemas (analyzer/python/schemas/*.json) double as the contract between
+the two halves and are validated in CI.
+
+
+--------------------------------------------------------------------------------
+ 7. Acceptance criteria for the analyzer module
+--------------------------------------------------------------------------------
+AC1.  ana.collect produces FACTS.json conforming to facts.schema.json on
+      the unmodified repo, in <= 60 s warm.
+AC2.  python -m analyzer on the current reports produces ANALYSIS.json
+      that includes (a) at least one critical/major finding traceable to
+      bms_master MCDC dead = 90.2% with iso_refs populated, and (b) zero
+      false positives on bms_slave (which is fully covered).
+AC3.  Every finding in ANALYSIS.json points to a rule_id present in
+      analyzer/knowledge/ AND to facts_used paths that resolve.
+AC4.  Removing one rule YAML file degrades gracefully (engine logs a
+      warning, doesn't crash, output marks the missing category).
+AC5.  Re-running with identical inputs produces byte-identical
+      ANALYSIS.json (deterministic ordering, no timestamps in findings).
+AC6.  No file outside analyzer/ + the two surgical edits §2.E1/E2 is
+      modified at runtime.
+AC7.  The expert system runs offline (no network, no LLM, no telemetry).
+
+
+--------------------------------------------------------------------------------
+ 8. Phasing
+--------------------------------------------------------------------------------
+Phase 0 -- this roadmap (DONE).
+Phase 1 -- §2.E1 cov enrichment + §2.E2 ASIL field in requirements.json
+           (small, isolated, unblocks both halves).
+Phase 2 -- F1 implementation (ana.collect + 5 metrics_*.m + facts_writer +
+           MATLAB unit tests).
+Phase 3 -- F2 skeleton (engine, rules loader, schemas, fixtures-based
+           Python unit tests with hand-crafted facts).
+Phase 4 -- knowledge base authoring : dead_code.yaml first (highest user
+           value), then model_arch, maab, iso26262, asil_policy.
+Phase 5 -- integration test on real reports + acceptance test with
+           injected dead block.
+Phase 6 -- wire into run_full_pipeline.m, README + docs/requirements.md
+           updates.
+
+Stop-and-ask checkpoints (per user constraint) :
+  X1. End of Phase 1 : confirm ASIL defaults proposed in §2 before they
+      are committed to requirements.json.
+  X2. End of Phase 4 : review the rule wording with the user (rules are
+      the assistant's "voice" -- must reflect the engineer's expectations).
+
+
+--------------------------------------------------------------------------------
+ 9. Open clarifications still pending  (please answer at start of Phase 1)
+--------------------------------------------------------------------------------
+Q1. ASIL defaults in §2 -- are the proposed ratings acceptable, or do
+    you have an OEM HARA we should adopt instead ?
+Q2. Should ANALYSIS.json findings be human-rendered to a Markdown
+    digest (analyzer/reports/ANALYSIS_<ts>.md) for engineers, or is JSON
+    enough ?  (Default plan : JSON only ; add MD only if asked.)
+Q3. Should ana.collect honour a 'fast' mode that skips ModelAdvisor
+    (the slow step, ~30-90 s) ?  Recommended yes :
+        ana.collect('advisor', false)
+Q4. Is the Python runtime constrained ?  We will assume Python 3.10+,
+    PyYAML, jsonschema -- nothing else.
+
+================================================================================
+END OF ROADMAP
+================================================================================

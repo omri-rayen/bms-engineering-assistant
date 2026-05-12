@@ -67,23 +67,15 @@ r.metrics.err_at_settle_pct = err_60;
 r.metrics.rmse_pct          = sqrt(mean((soc(i60:end) - SoC_true(i60:end)).^2));
 r.metrics.bias_pct          = mean(soc(i60:end) - SoC_true(i60:end));
 
-% EKF SoC vs true SoC trace.
-try
-    here    = fileparts(mfilename('fullpath'));
-    valRoot = fileparts(fileparts(fileparts(here)));
-    plotDir = fullfile(valRoot, 'reports', 'plots', 'mil');
-    if ~isfolder(plotDir), mkdir(plotDir); end
-    fig = figure('Visible','off','Position',[100 100 900 400]);
-    plot(t, SoC_true, 'k-',  'LineWidth', 1.0); hold on;
-    plot(t, soc,      'r--', 'LineWidth', 1.2);
-    yline(SoC_ekf_init*100, 'b:', 'EKF init');
-    xlabel('time [s]'); ylabel('SoC [%]'); grid on;
-    legend({'true','EKF estimate'}, 'Location','best');
-    title(sprintf('REQ-LL-BMS-SOC-01  -  err@%.0fs = %.2f %%  (tol %.1f %%)', ...
-        req.BMS_SOC_settle_time_s, err_60, tol));
-    exportgraphics(fig, fullfile(plotDir, 'bms_soc_convergence.png'), 'Resolution', 120);
-    close(fig);
-catch ME
-    warning('mil:soc:plot', 'plot failed: %s', ME.message);
-end
+time_out = val.signal(out, 'SoC_pack').t;
+stim = struct('t', t, 'y', I_const*ones(size(t)), 'label', 'I_{pack} [A]   (constant 30 A)');
+resp = struct('t', time_out, 'y', [soc, SoC_true], 'label', 'SoC [%]   (estimate solid, truth faint)', ...
+    'channels', {{'EKF','true'}}, ...
+    'thresholds', {{SoC_ekf_init*100,'EKF init'}});
+phases = {0, req.BMS_SOC_settle_time_s, 'transient'; req.BMS_SOC_settle_time_s, T, 'settled'};
+asserts = {req.BMS_SOC_settle_time_s, ok, sprintf('|err|=%.2f%% < %.1f%%', err_60, tol)};
+r.signals_plot = string(val.scenario_plot(r, struct( ...
+    'plot_dir', val.plot_root('mil','bms'), 'filename', 'BMS-SOC-01.png', ...
+    'subtitle', sprintf('EKF SoC convergence on constant 30 A discharge (init offset = %.1f%%)', req.BMS_SOC_init_offset_pct), ...
+    'stim', stim, 'resp', resp, 'phases', {phases}, 'asserts', {asserts})));
 end

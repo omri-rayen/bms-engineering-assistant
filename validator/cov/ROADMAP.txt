@@ -1,0 +1,246 @@
+================================================================================
+ ROADMAP — Dead-code coverage for the BMS (validator module, 3rd functionality)
+================================================================================
+Authored      : 2026-05-08
+Scope         : bms_master.slx + bms_slave.slx ONLY
+Definition    : Model-level dead code = elements not exercised by the BMS MIL
+                stimulus set, measured with Simulink Coverage.
+                100 % coverage  <=>  0 % dead code  (per requirement).
+Stimulus      : the existing 15 MIL BMS tests under
+                validator/mil/tests/bms/test_*.m  (cumulative, merged).
+Entry point   : NEW  cov.run     (mirrors mil.run / sil.run / pil.run)
+Output        : validator/reports/COV_<timestamp>.json  +  sticky COV.json
+
+
+--------------------------------------------------------------------------------
+ 1. Required toolboxes / licences
+--------------------------------------------------------------------------------
+Already in the project (no action):
+  - MATLAB R2024b
+  - Simulink
+  - Stateflow                (bms_master severity FSM)
+  - Embedded Coder           (used by SIL/PIL)
+  - Deep Learning Toolbox    (LSTM)
+
+NEW dependency to install / licence-check before implementation:
+  - Simulink Coverage        (mandatory — provides cvtest / cvsim / cvdata
+                              + the CovEnable model parameters and the
+                              Stateflow coverage instrumentation).
+
+The roadmap aborts cleanly with a clear error if Simulink Coverage is not
+licensed (license('test','Simulink_Coverage') == false).
+
+No other third-party tool is needed.  We deliberately do NOT pull in
+gcov / LDRA / Bullseye / Polyspace — those would only be relevant for
+generated-C dead code (out of scope, see §7).
+
+
+--------------------------------------------------------------------------------
+ 2. Files to create   (NOTHING is to be modified outside validator/cov/)
+--------------------------------------------------------------------------------
+validator/
+  cov/
+    +cov/
+      run.m                     <-- the new entry point  cov.run
+      collect.m                 <-- helper: turn cvdata -> JSON-ready struct
+    tests/                      <-- (empty placeholder, follows the
+                                     mil/sil/pil package layout convention)
+    ROADMAP.txt                 <-- this file
+
+Total new code budget: ~150 lines of MATLAB across run.m + collect.m.
+Reuses val.snapshot_ws / val.restore_ws / val.export_json / val.new_result.
+No change to existing tests, no change to the .slx models.
+
+
+--------------------------------------------------------------------------------
+ 3. Approach  (minimal, three steps)
+--------------------------------------------------------------------------------
+STEP A — instrument
+  Models in scope: { 'bms_master', 'bms_slave' }.
+  For each model m in scope:
+      load_system(m)
+      set_param(m, 'CovEnable',                'on')
+      set_param(m, 'RecordCoverage',           'on')
+      set_param(m, 'CovMetricSettings',        'dcmtr')   % Decision +
+                                                          % Condition +
+                                                          % MCDC + Table +
+                                                          % Relational-bdry
+      set_param(m, 'CovModelRefEnable',        'on')      % follow refs
+      set_param(m, 'CovModelRefRecursive',     'on')
+      set_param(m, 'CovSFcnEnable',            'on')      % Stateflow on
+      set_param(m, 'CovSaveSingleToWSVar',     'on')
+      set_param(m, 'CovSaveName',              'covdata')
+      set_param(m, 'CovOutputDir',             'slprj/coverage')
+
+  Note: bms_master references bms_slave (x8 modules).  CovModelRefEnable +
+  CovModelRefRecursive automatically aggregates coverage across all 8
+  instances into a single bms_slave cvdata — no manual deduplication.
+
+STEP B — run the existing BMS MIL stimulus, merge cvdata
+  cumulative = []
+  for each test t in dir('validator/mil/tests/bms/test_*.m'):
+      snap = val.snapshot_ws
+      try
+          feval(testname)            % runs the existing MIL test as-is
+          cd = evalin('base','covdata')
+          if isempty(cumulative), cumulative = cd
+          else                    cumulative = cumulative + cd      % cvdata
+                                                                    % overload
+          end
+      catch ME
+          log error, continue
+      end
+      val.restore_ws(snap)
+
+  Cumulative cvdata is the union over all 15 BMS MIL stimuli.
+  Coverage settings are also enabled for the SIL trip (TripA02) only if the
+  user later opts in via cov.run('include_sil', true) — default OFF to keep
+  the run fast and to honour the "BMS MIL stimuli" answer.
+
+STEP C — extract metrics, write JSON
+  For each model m in scope, query cvdata with the documented API:
+      info_exec = coverageInfo(cumulative, m, 'execution')
+      info_dec  = coverageInfo(cumulative, m, 'decision')
+      info_con  = coverageInfo(cumulative, m, 'condition')
+      info_mcdc = coverageInfo(cumulative, m, 'mcdc')
+  Each returns [covered, total].  We compute:
+      coverage_pct = 100 * covered / total
+      dead_pct     = 100 - coverage_pct
+  We also enumerate uncovered objects via cv.cvdatagroup / cvDataReader
+  to populate a flat "uncovered" list (block path + metric + branch).
+
+
+--------------------------------------------------------------------------------
+ 4. JSON report shape (validator/reports/COV.json)
+--------------------------------------------------------------------------------
+{
+  "timestamp"   : "20260508_HHMMSS",
+  "suite"       : "cov",
+  "scope"       : ["bms_master", "bms_slave"],
+  "stimulus"    : {
+      "source"  : "validator/mil/tests/bms/test_*.m",
+      "n_tests" : 15,
+      "merged"  : true
+  },
+  "summary": {
+      "execution" : { "total": N, "covered": K, "coverage_pct": X, "dead_pct": Y },
+      "decision"  : { ... },
+      "condition" : { ... },
+      "mcdc"      : { ... }
+  },
+  "by_model": {
+      "bms_master": { "execution": {...}, "decision": {...}, ... },
+      "bms_slave" : { "execution": {...}, "decision": {...}, ... }
+  },
+  "uncovered": [
+      { "model": "bms_master",
+        "path" : "bms_master/Severity_FSM/Derate_to_Shut",
+        "metric": "decision",
+        "branch": "false" },
+      ...
+  ],
+  "verdict": {
+      "dead_code_pct"      : <max over metrics of dead_pct>,
+      "dead_code_threshold": 0.0,           // current BMS has no dead code
+      "status"             : "pass" | "fail"
+  }
+}
+
+Verdict: pass iff dead_code_pct <= dead_code_threshold (default 0.0,
+configurable via cov.run('threshold', x)).  This satisfies the contract
+"current BMS model has no dead code, so 100 % coverage shall report 0 %".
+
+
+--------------------------------------------------------------------------------
+ 5. Public API
+--------------------------------------------------------------------------------
+cov.run                             % all defaults
+cov.run('models',     {'bms_master'})           % subset of scope
+cov.run('threshold',  0.0)                      % accept up to X% dead
+cov.run('include_sil', false)                   % add the SIL trip stimulus
+cov.run('outFile',    'validator/reports/COV_custom.json')
+
+Console summary mirrors mil.run / sil.run.
+Optional bar plot (validator/reports/plots/cov/summary.png) showing
+covered vs dead per metric per model — kept off by default to follow the
+"no over-engineering" rule; gated by 'plot' name-value (default false).
+
+
+--------------------------------------------------------------------------------
+ 6. Pipeline integration
+--------------------------------------------------------------------------------
+- cov.run is STANDALONE, like plant_convergence.  It is NOT auto-invoked
+  by mil.run / sil.run / pil.run.
+- Recommended order in a full validation campaign:
+        mil.plant_convergence
+        mil.run
+        cov.run                         <-- new, between MIL and SIL
+        sil.run
+        pil.run
+- README.md / docs/requirements.md updates (deferred to implementation
+  phase, NOT done here):
+      * add a "Coverage" row to the test inventory table.
+      * add REQ-LL-COV-DEAD-01 to validator/requirements/requirements.json:
+          "Cumulative coverage of bms_master + bms_slave under the BMS MIL
+           stimulus set SHALL leave <= req.COV_dead_pct_max (default 0 %)
+           of design elements unreached on Decision, Condition and MCDC."
+
+
+--------------------------------------------------------------------------------
+ 7. Explicitly OUT OF SCOPE
+--------------------------------------------------------------------------------
+- Plant model coverage (cell_ecm_2rc, module_12s, pack_96s, coolant) — the
+  BMS-only constraint excludes these.
+- LSTM / fault_predictor coverage of internal layers — the dlnetwork
+  predict block has no Simulink-Coverage-instrumentable design; only its
+  input/output gating logic inside bms_master remains in scope.
+- Generated-C dead code (gcov-style on bms_master.c).  This would need a
+  third-party C-coverage tool and a separate SIL run with --coverage.  Can
+  be added later as a 4th functionality if required.
+- Property proving / formal dead-logic analysis (Simulink Design Verifier)
+  — heavier toolbox, not requested.
+
+
+--------------------------------------------------------------------------------
+ 8. Caveats / things to watch during implementation
+--------------------------------------------------------------------------------
+(a) Toggling CovEnable invalidates the slprj cache for SIL/PIL builds.
+    cov.run will end with set_param(...,'CovEnable','off') on every model
+    it touched, AND will dirty-clean the model in memory (close_system
+    with the original "dirty" flag preserved) so a subsequent sil.run /
+    pil.run is not forced into a full rebuild for the wrong reason.
+(b) Stateflow coverage on the severity FSM requires CovSFcnEnable='on'
+    (not just CovEnable).
+(c) cvdata `+` overload merges identical model versions only; if a test
+    edits a model parameter via set_param, that parameter must be set
+    BEFORE coverage starts so all 15 runs share one cvdata schema.  All
+    current MIL BMS tests only set inputs via Simulink.SimulationInput,
+    not the model itself, so this should hold — verify on first run.
+(d) bms_master "dirty" warning at end of pipeline (already documented in
+    the repo memory) is unrelated to this feature; do not try to fix it
+    inside cov.run.
+(e) MIL tests that ERROR (not fail) still contribute partial cvdata up to
+    the error point.  We accept that and log the error in COV.json under
+    "stimulus.errors" for traceability.
+
+
+--------------------------------------------------------------------------------
+ 9. Acceptance criteria for the implementation phase
+--------------------------------------------------------------------------------
+1. `cov.run` produces validator/reports/COV.json with the schema in §4.
+2. On the unmodified repo: dead_code_pct == 0.00 on Decision and Condition
+   (MCDC may be < 100 % on protective branches that the test set does not
+    enumerate every input combination for — to be confirmed on first run;
+    if so, MCDC threshold is relaxed to req.COV_mcdc_dead_pct_max with a
+    documented justification, NOT silently masked).
+3. Introducing a deliberately unreachable Switch case in a sandbox copy
+   of bms_slave makes dead_code_pct > 0 and `verdict.status` = "fail".
+4. cov.run('models',{'bms_master'}) runs in under ~3 minutes on the dev
+   machine (15 MIL tests × normal-mode sim with coverage instrumentation;
+   coverage roughly 1.3-1.8 x slower than nominal MIL).
+5. No file outside validator/cov/ is modified by cov.run at runtime
+   (other than the COV*.json reports it emits).
+
+================================================================================
+END OF ROADMAP
+================================================================================

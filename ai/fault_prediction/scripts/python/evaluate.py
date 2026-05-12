@@ -1,9 +1,6 @@
 """Evaluate the trained LSTM on the test split.
 
-Reports per-class precision/recall/F1, ROC-AUC, PR-AUC and a lead-time
-histogram (how many seconds the model fires before the rule-based detector
-would have crossed its threshold). Also writes false-alarm counts on the
-nominal portion of test.
+Per-class precision/recall/F1, ROC-AUC, PR-AUC, lead-time histogram, false-alarm counts.
 """
 
 from __future__ import annotations
@@ -32,7 +29,14 @@ LABELS    = ["OT", "OV", "UV"]
 DT        = 0.1   # sample period [s]
 S         = 1     # window stride [samples] -- must match preprocess.py
 BATCH     = 512
-LOOKBACK_S = 20.0 # how far back (s) to scan for a pre-event prediction
+
+# look-ahead horizons [samples] – mirrors predictor.H_*_samples in init_system.m
+H_SAMPLES = {"OT": 300, "OV": 100, "UV": 100}
+
+MIN_LEAD_S = {"OT": 30.0, "OV": 10.0, "UV": 10.0}  # min median lead per class [s]
+
+# search window before first y_true=1 sample [s]
+LOOKBACK_S = 60.0
 
 
 def load_test():
@@ -53,15 +57,9 @@ def predict(model, X, device):
     return np.concatenate(out)
 
 
-def event_lead_times(y_true, y_pred, stride_s):
-    """For every contiguous positive run in y_true, return the lead time
-    (s) between the first positive prediction in [start - LOOKBACK, end]
-    and the event start. Positive lead = predicted before truth.
-
-    NOTE: y_true is anchored to the BMS WARN-level crossing (see
-    run_and_extract.m: THR_OT/OV/UV are bms.*_warn, not shutdown). So
-    the lead time computed here is "time between alarm and warn fault",
-    which is the quantity gated by REQ-FP-04 (>= MIN_LEAD_S).
+def event_lead_times(y_true, y_pred, stride_s, h_offset_s):
+    """Lead time [s] of LSTM alarm vs BMS warn crossing.
+    Lead = (y_true_start - first_pred) * dt + H*dt  (positive = alarm before warn).
     """
     LOOKBACK = max(1, int(round(LOOKBACK_S / stride_s)))
     leads, n_events = [], 0
@@ -76,7 +74,7 @@ def event_lead_times(y_true, y_pred, stride_s):
         lo = max(0, s - LOOKBACK)
         hits = np.where(y_pred[lo:e] > 0)[0]
         if hits.size:
-            leads.append((s - (lo + hits[0])) * stride_s)
+            leads.append((s - (lo + hits[0])) * stride_s + h_offset_s)
 
     return leads, n_events
 
@@ -143,7 +141,7 @@ def main():
                     fa = int((np.diff(np.concatenate([[0], pt, [0]])) == 1).sum())
                     fa_counts[lbl] += fa
                 continue
-            leads, _ = event_lead_times(yt, pt, stride_s)
+            leads, _ = event_lead_times(yt, pt, stride_s, H_SAMPLES[lbl] * DT)
             all_leads[lbl].extend(leads)
 
     for lbl in LABELS:
@@ -157,20 +155,20 @@ def main():
 
     print(f"\nFalse-alarm events on {n_nominal_runs} nominal test run(s):  {fa_counts}")
 
-    # ---- REQ-FP-04 lead-time gate (>= MIN_LEAD_S vs warn fault) ---------
-    MIN_LEAD_S = 5.0
-    print(f"\n=== REQ-FP-04 gate: median lead-time vs warn fault >= {MIN_LEAD_S:.1f}s ===")
+    # ---- Lead-time gate vs WARN crossing per class ----------------------
+    print("\n=== Lead-time gate: median lead vs warn crossing per class ===")
     lead_gate = {}
     for lbl in LABELS:
         L = np.array(all_leads[lbl])
+        min_s = MIN_LEAD_S[lbl]
         if L.size == 0:
-            lead_gate[lbl] = {"median_s": None, "pass": None, "n_events": 0}
+            lead_gate[lbl] = {"median_s": None, "min_s": min_s, "pass": None, "n_events": 0}
             print(f"  {lbl}: SKIP (no events)")
             continue
         med = float(np.median(L))
-        ok = med >= MIN_LEAD_S
-        lead_gate[lbl] = {"median_s": med, "pass": bool(ok), "n_events": int(L.size)}
-        print(f"  {lbl}: median={med:+.2f}s  -> {'PASS' if ok else 'FAIL'}")
+        ok = med >= min_s
+        lead_gate[lbl] = {"median_s": med, "min_s": min_s, "pass": bool(ok), "n_events": int(L.size)}
+        print(f"  {lbl}: median={med:+.2f}s  min={min_s:.1f}s  -> {'PASS' if ok else 'FAIL'}")
 
     # ---- Plots ------------------------------------------------------------
     fig, axes = plt.subplots(1, 3, figsize=(13, 3.5))
@@ -196,8 +194,7 @@ def main():
         "sample_level": rows,
         "lead_time_s": {l: list(map(float, all_leads[l])) for l in LABELS},
         "lead_time_gate": {
-            "min_lead_s": MIN_LEAD_S,
-            "anchored_to": "BMS warn fault crossing (REQ-FP-04)",
+            "anchored_to": "BMS warn fault crossing (lead = y_true_start_to_pred + H)",
             "per_class":   lead_gate,
         },
         "false_alarm_events_on_nominal": fa_counts,

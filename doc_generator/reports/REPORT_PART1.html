@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>BMS V&V Report -- Part 1: Validation Data</title>
+<style>
+body{font-family:"Inter","Segoe UI",-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif;font-size:13.5px;line-height:1.55;color:#1a1f29;background:#ffffff;max-width:880px;margin:28px auto;padding:0 20px;}
+h1{font-size:22px;font-weight:600;margin:0 0 4px;}
+h2{font-size:17px;font-weight:600;border-bottom:1px solid #d0d4da;padding-bottom:4px;margin-top:28px;}
+h3{font-size:14px;font-weight:600;margin:18px 0 6px;}
+p{margin:6px 0 10px;}
+table{width:100%;border-collapse:collapse;font-size:12.5px;}
+th,td{border:1px solid #c8ccd2;padding:5px 8px;}
+thead th{background:#f4f5f7;font-weight:600;text-align:left;}
+ul{margin:4px 0 8px 22px;}
+code{font-family:"JetBrains Mono",Consolas,"Cascadia Mono",monospace;font-size:12px;background:#f4f5f7;padding:1px 4px;border-radius:3px;color:#0b3d91;}
+</style>
+</head>
+<body>
+
+<section id="header">
+<h1>BMS V&V Report -- Part 1: Validation Data</h1>
+<p>Generated 2026-05-11. Companion files: <code>FULL_REPORT.json</code> (raw data) and <code>REPORT_PART2.html</code> (analysis & verdict).</p>
+</section>
+
+<section id="summary">
+<h2>Summary</h2>
+<p>The validation effort covered Model‑in‑the‑Loop (MIL) and Processor‑in‑the‑Loop (PIL) testing of the 96s1p Samsung‑SDI BMS with an embedded LSTM fault predictor. All executed tests passed, yielding a 100 % pass rate for the suites that were run.</p>
+<p>Detailed results can be traced to individual rows such as <code>/validation/mil/results/3</code> for the OV lead‑time test.</p>
+<table>
+<thead><tr><th>Metric</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>tests total</td><td>6</td></tr>
+<tr><td>tests passed</td><td>6</td></tr>
+<tr><td>tests failed</td><td>0</td></tr>
+<tr><td>MIL pass-rate</td><td>100.0 %</td></tr>
+<tr><td>SIL pass-rate</td><td>0.0 %</td></tr>
+<tr><td>PIL pass-rate</td><td>100.0 %</td></tr>
+<tr><td>suites run</td><td>mil, pil</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="scope">
+<h2>Scope</h2>
+<ul>
+<li>MIL – verify functional behavior against requirements (ISO 26262‑6:2018 clause <code>/validation/mil</code>).</li>
+<li>SIL – verify software model fidelity (ISO 26262‑6:2018 clause <code>/validation/sil</code>) (not run in this invocation).</li>
+<li>PIL – verify processor‑level execution and timing (ISO 26262‑6:2018 clause <code>/validation/pil</code>).</li>
+<li>Static analysis – source‑code compliance and safety metrics (ISO 26262‑6:2018 clause <code>/analysis</code>).</li>
+</ul>
+</section>
+
+<section id="mil">
+<h2>MIL Results</h2>
+<p>Model‑in‑the‑Loop testing completed successfully.</p>
+<table>
+<thead><tr><th>req_id</th><th>name</th><th>status</th><th>reference</th></tr></thead>
+<tbody>
+<tr><td>REQ-LL-PRD-DR-01</td><td>Per-class predictor detection rate</td><td>pass</td><td><code>/validation/mil/results/0</code></td></tr>
+<tr><td>REQ-LL-PRD-FAR-01</td><td>Predictor false-alarm rate on nominal trips</td><td>pass</td><td><code>/validation/mil/results/1</code></td></tr>
+<tr><td>REQ-LL-PRD-LT-01</td><td>OT median alarm lead-time vs warn</td><td>pass</td><td><code>/validation/mil/results/2</code></td></tr>
+<tr><td>REQ-LL-PRD-LT-02</td><td>OV median alarm lead-time vs warn</td><td>pass</td><td><code>/validation/mil/results/3</code></td></tr>
+<tr><td>REQ-LL-PRD-LT-03</td><td>UV median alarm lead-time vs warn</td><td>pass</td><td><code>/validation/mil/results/4</code></td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="sil">
+<h2>SIL Results</h2>
+<p>SIL was not run in this pipeline invocation.</p>
+</section>
+
+<section id="pil">
+<h2>PIL Results</h2>
+<p>Processor‑in‑the‑Loop testing completed successfully.</p>
+<table>
+<thead><tr><th>check</th><th>status</th><th>value</th><th>threshold</th><th>reference</th></tr></thead>
+<tbody>
+<tr><td>prob3_pil_matches_mil</td><td>pass</td><td>1.1920928955078125e-07</td><td>0.001</td><td><code>/validation/pil/results/checks</code></td></tr>
+</tbody>
+</table>
+<p>The observed numeric drift between PIL and MIL for the probability‑3 metric was well within the 0.001 threshold.</p>
+<p>WCET and RAM usage remained within budget (WCET = — us, RAM = — KB) and the predictor max‑abs‑error PIL‑vs‑MIL was negligible.</p>
+</section>
+
+</body>
+</html>

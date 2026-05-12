@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0",
+  "timestamp": "20260510_193355",
+  "inputs": {
+    "facts": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\analyzer\\reports\\FACTS.json",
+    "coverage": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\COV.json",
+    "mil": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\MIL.json",
+    "sil": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\SIL.json",
+    "pil": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\PIL.json",
+    "requirements": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\requirements\\requirements.json"
+  },
+  "summary": {
+    "n_findings": 1,
+    "by_severity": {
+      "info": 0,
+      "minor": 0,
+      "major": 1,
+      "critical": 0
+    },
+    "by_category": {
+      "dead_code": 1
+    },
+    "verdict": "review_required"
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "rule_id": "COV-SLAVE-DEC",
+      "category": "dead_code",
+      "severity": "major",
+      "wip": false,
+      "finding": "bms_slave decision coverage gap = 45.00% (ASIL C, limit 1%)",
+      "reasoning": "Branch coverage is highly recommended for ASIL C. The bms_slave MIL stimulus does not exercise both directions of every decision.",
+      "recommend": [
+        "Identify the failing decisions in the Coverage Report and add driving stimulus, or justify with \u00a79.4.5."
+      ],
+      "refs": [
+        "ISO 26262-6:2018 Table 12 (branch coverage, ASIL C = ++)"
+      ],
+      "locator": "",
+      "evidence": {
+        "facts_used": [
+          "coverage.bms_slave.decision.dead_pct",
+          "policy.limits.bms_slave.dec"
+        ],
+        "values": {
+          "value": 45,
+          "limit": 1
+        }
+      }
+    }
+  ],
+  "trace": [
+    {
+      "pass": 1,
+      "rule_id": "COV-SLAVE-DEC",
+      "category": "dead_code",
+      "source": "dead_code.yaml",
+      "fired": true,
+      "bindings": {
+        "value": 45,
+        "limit": 1
+      },
+      "facts": [
+        "coverage.bms_slave.decision.dead_pct",
+        "policy.limits.bms_slave.dec"
+      ]
+    }
+  ]
+}

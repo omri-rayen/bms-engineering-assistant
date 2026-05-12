@@ -1,8 +1,6 @@
 """Train the LSTM fault predictor.
 
-Loads the .npz splits produced by preprocess.py, trains with weighted BCE
-(UV weight capped to keep OT/OV from collapsing), early-stops on val loss,
-and saves best.pt + a per-class threshold tuned on val.
+Weighted BCE + early stopping on val loss. Saves best.pt + per-class thresholds.
 """
 
 from __future__ import annotations
@@ -27,9 +25,7 @@ MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 LABELS      = ["OT", "OV", "UV"]
 W_MAX       = 25.0       # cap on per-class positive weight
-BATCH       = 1024       # large batch keeps CPU throughput high on the dense
-                         # stride=1 dataset (~2M windows) without changing the
-                         # gradient signal vs the old stride=5 setup.
+BATCH       = 1024
 LR          = 2e-3       # scaled with batch (linear rule)
 MAX_EPOCHS  = 25
 ES_PATIENCE = 5
@@ -97,12 +93,7 @@ def per_class_metrics(y, p, thr=0.5):
 
 
 def best_thresholds(y, p, grid=None, beta=0.5):
-    """Per-class threshold maximising F-beta on validation predictions.
-
-    beta < 1 favours precision over recall. We use 0.5 because false alarms
-    on nominal trips are operationally costly (driver warnings, false flags)
-    while a missed window is recovered by the next one in a streaming setup.
-    """
+    """Per-class threshold maximising F-beta (beta=0.5 favours precision) on val predictions."""
     if grid is None:
         grid = np.linspace(0.05, 0.95, 19)
     b2 = beta * beta

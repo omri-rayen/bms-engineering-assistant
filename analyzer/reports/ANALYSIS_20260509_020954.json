@@ -1,0 +1,1121 @@
+{
+  "schema_version": "1.0",
+  "timestamp": "20260509_020954",
+  "inputs": {
+    "facts": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\analyzer\\reports\\FACTS.json",
+    "coverage": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\COV.json",
+    "mil": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\MIL.json",
+    "sil": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\SIL.json",
+    "pil": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\PIL.json",
+    "requirements": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\requirements\\requirements.json"
+  },
+  "summary": {
+    "n_findings": 23,
+    "by_severity": {
+      "info": 0,
+      "minor": 20,
+      "major": 2,
+      "critical": 1
+    },
+    "by_category": {
+      "dead_code": 2,
+      "model_arch": 21
+    },
+    "verdict": "blocking"
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "rule_id": "DC-MASTER-DEC-OVER",
+      "category": "dead_code",
+      "severity": "critical",
+      "finding": "bms_master overall decision dead = 2.77% (ASIL D, limit 0.0%)",
+      "reasoning": "The model-level decision-coverage gap is 2.77% against an ASIL-D budget of 0.0%. Per-block findings list the individual offenders -- this rule is the roll-up gate.",
+      "recommend": [
+        "Close the per-block decision gaps reported by DC-MASTER-BLOCK first; this aggregate will trip back below 0.0% automatically."
+      ],
+      "refs": [
+        "ISO 26262-6:2018, table 7"
+      ],
+      "locator": "",
+      "evidence": {
+        "facts_used": [
+          "coverage.bms_master.decision.dead_pct",
+          "policy.component_asil.bms_master",
+          "policy.limits.bms_master.dec"
+        ],
+        "values": {
+          "asil": "D",
+          "value": 2.772466539196941,
+          "limit": 0
+        }
+      }
+    },
+    {
+      "id": "F-002",
+      "rule_id": "DC-MASTER-MCDC-OVER",
+      "category": "dead_code",
+      "severity": "minor",
+      "finding": "bms_master overall MC/DC dead = 90.24% (limit 0.0%)",
+      "reasoning": "MC/DC closure on legacy logic is hard. 90.24% residual is usually accepted with a \u00a79.4.5 rationale rather than re-architected.",
+      "recommend": [],
+      "refs": [
+        "ISO 26262-6:2018 \u00a79.4.5"
+      ],
+      "locator": "",
+      "evidence": {
+        "facts_used": [
+          "coverage.bms_master.mcdc.dead_pct",
+          "policy.limits.bms_master.mcdc"
+        ],
+        "values": {
+          "value": 90.2439024390244,
+          "limit": 0
+        }
+      }
+    },
+    {
+      "id": "F-003",
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "Default-named block `Gain1` (Gain) at bms_master/Current_Monitor/Gain1",
+      "reasoning": "`bms_master/Current_Monitor/Gain1` keeps Simulink's auto-generated name `Gain1`. Inside `bms_master/Current_Monitor` this hides what the Gain actually does and breaks requirement-to-implementation traceability that ISO 26262-8 \u00a78.4.3 expects from a production model. MAAB jc_0201 forbids default names.",
+      "recommend": [
+        "`hilite_system('bms_master/Current_Monitor/Gain1')` to locate the block.",
+        "Rename `Gain1` after its function in `bms_master/Current_Monitor` (e.g. for a Gain use `<Signal>_Scale`, for a Sum use `<Output>_Sum`)."
+      ],
+      "refs": [
+        "MAAB jc_0201, ISO 26262-8:2018 \u00a78.4.3"
+      ],
+      "locator": "hilite_system('bms_master/Current_Monitor/Gain1')",
+      "evidence": {
+        "facts_used": [
+          "blk.name",
+          "blk.parent",
+          "blk.path",
+          "blk.type"
+        ],
+        "values": {
+          "path": "bms_master/Current_Monitor/Gain1",
+          "name": "Gain1",
+          "type": "Gain",
+          "parent": "bms_master/Current_Monitor"
+        }
+      }
+    },
+    {
+      "id": "F-004",
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "Default-named block `Gain2` (Gain) at bms_master/Current_Monitor/Gain2",
+      "reasoning": "`bms_master/Current_Monitor/Gain2` keeps Simulink's auto-generated name `Gain2`. Inside `bms_master/Current_Monitor` this hides what the Gain actually does and breaks requirement-to-implementation traceability that ISO 26262-8 \u00a78.4.3 expects from a production model. MAAB jc_0201 forbids default names.",
+      "recommend": [
+        "`hilite_system('bms_master/Current_Monitor/Gain2')` to locate the block.",
+        "Rename `Gain2` after its function in `bms_master/Current_Monitor` (e.g. for a Gain use `<Signal>_Scale`, for a Sum use `<Output>_Sum`)."
+      ],
+      "refs": [
+        "MAAB jc_0201, ISO 26262-8:2018 \u00a78.4.3"
+      ],
+      "locator": "hilite_system('bms_master/Current_Monitor/Gain2')",
+      "evidence": {
+        "facts_used": [
+          "blk.name",
+          "blk.parent",
+          "blk.path",
+          "blk.type"
+        ],
+        "values": {
+          "path": "bms_master/Current_Monitor/Gain2",
+          "name": "Gain2",
+          "type": "Gain",
+          "parent": "bms_master/Current_Monitor"
+        }
+      }
+    },
+    {
+      "id": "F-005",
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "Default-named block `Switch1` (Switch) at bms_master/Current_Monitor/Switch1",
+      "reasoning": "`bms_master/Current_Monitor/Switch1` keeps Simulink's auto-generated name `Switch1`. Inside `bms_master/Current_Monitor` this hides what the Switch actually does and breaks requirement-to-implementation traceability that ISO 26262-8 \u00a78.4.3 expects from a production model. MAAB jc_0201 forbids default names.",
+      "recommend": [
+        "`hilite_system('bms_master/Current_Monitor/Switch1')` to locate the block.",
+        "Rename `Switch1` after its function in `bms_master/Current_Monitor` (e.g. for a Gain use `<Signal>_Scale`, for a Sum use `<Output>_Sum`)."
+      ],
+      "refs": [
+        "MAAB jc_0201, ISO 26262-8:2018 \u00a78.4.3"
+      ],
+      "locator": "hilite_system('bms_master/Current_Monitor/Switch1')",
+      "evidence": {
+        "facts_used": [
+          "blk.name",
+          "blk.parent",
+          "blk.path",
+          "blk.type"
+        ],
+        "values": {
+          "path": "bms_master/Current_Monitor/Switch1",
+          "name": "Switch1",
+          "type": "Switch",
+          "parent": "bms_master/Current_Monitor"
+        }
+      }
+    },
+    {
+      "id": "F-006",
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "Default-named block `Switch2` (Switch) at bms_master/Current_Monitor/Switch2",
+      "reasoning": "`bms_master/Current_Monitor/Switch2` keeps Simulink's auto-generated name `Switch2`. Inside `bms_master/Current_Monitor` this hides what the Switch actually does and breaks requirement-to-implementation traceability that ISO 26262-8 \u00a78.4.3 expects from a production model. MAAB jc_0201 forbids default names.",
+      "recommend": [
+        "`hilite_system('bms_master/Current_Monitor/Switch2')` to locate the block.",
+        "Rename `Switch2` after its function in `bms_master/Current_Monitor` (e.g. for a Gain use `<Signal>_Scale`, for a Sum use `<Output>_Sum`)."
+      ],
+      "refs": [
+        "MAAB jc_0201, ISO 26262-8:2018 \u00a78.4.3"
+      ],
+      "locator": "hilite_system('bms_master/Current_Monitor/Switch2')",
+      "evidence": {
+        "facts_used": [
+          "blk.name",
+          "blk.parent",
+          "blk.path",
+          "blk.type"
+        ],
+        "values": {
+          "path": "bms_master/Current_Monitor/Switch2",
+          "name": "Switch2",
+          "type": "Switch",
+          "parent": "bms_master/Current_Monitor"
+        }
+      }
+    },
+    {
+      "id": "F-007",
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "Default-named block `Constant1` (Constant) at bms_master/Fault_Debounce/Constant1",
+      "reasoning": "`bms_master/Fault_Debounce/Constant1` keeps Simulink's auto-generated name `Constant1`. Inside `bms_master/Fault_Debounce` this hides what the Constant actually does and breaks requirement-to-implementation traceability that ISO 26262-8 \u00a78.4.3 expects from a production model. MAAB jc_0201 forbids default names.",
+      "recommend": [
+        "`hilite_system('bms_master/Fault_Debounce/Constant1')` to locate the block.",
+        "Rename `Constant1` after its function in `bms_master/Fault_Debounce` (e.g. for a Gain use `<Signal>_Scale`, for a Sum use `<Output>_Sum`)."
+      ],
+      "refs": [
+        "MAAB jc_0201, ISO 26262-8:2018 \u00a78.4.3"
+      ],
+      "locator": "hilite_system('bms_master/Fault_Debounce/Constant1')",
+      "evidence": {
+        "facts_used": [
+          "blk.name",
+          "blk.parent",
+          "blk.path",
+          "blk.type"
+        ],
+        "values": {
+          "path": "bms_master/Fault_Debounce/Constant1",
+          "name": "Constant1",
+          "type": "Constant",
+          "parent": "bms_master/Fault_Debounce"
+        }
+      }
+    },
+    {
+      "id": "F-008",
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "Default-named block `Constant2` (Constant) at bms_master/Fault_Debounce/Constant2",
+      "reasoning": "`bms_master/Fault_Debounce/Constant2` keeps Simulink's auto-generated name `Constant2`. Inside `bms_master/Fault_Debounce` this hides what the Constant actually does and breaks requirement-to-implementation traceability that ISO 26262-8 \u00a78.4.3 expects from a production model. MAAB jc_0201 forbids default names.",
+      "recommend": [
+        "`hilite_system('bms_master/Fault_Debounce/Constant2')` to locate the block.",
+        "Rename `Constant2` after its function in `bms_master/Fault_Debounce` (e.g. for a Gain use `<Signal>_Scale`, for a Sum use `<Output>_Sum`)."
+      ],
+      "refs": [
+        "MAAB jc_0201, ISO 26262-8:2018 \u00a78.4.3"
+      ],
+      "locator": "hilite_system('bms_master/Fault_Debounce/Constant2')",
+      "evidence": {
+        "facts_used": [
+          "blk.name",
+          "blk.parent",
+          "blk.path",
+          "blk.type"
+        ],
+        "values": {
+          "path": "bms_master/Fault_Debounce/Constant2",
+          "name": "Constant2",
+          "type": "Constant",
+          "parent": "bms_master/Fault_Debounce"
+        }
+      }
+    },
+    {
+      "id": "F-009",
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "Default-named block `Constant1` (Constant) at bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter/Constant1",
+      "reasoning": "`bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter/Constant1` keeps Simulink's auto-generated name `Constant1`. Inside `bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter` this hides what the Constant actually does and breaks requirement-to-implementation traceability that ISO 26262-8 \u00a78.4.3 expects from a production model. MAAB jc_0201 forbids default names.",
+      "recommend": [
+        "`hilite_system('bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter/Constant1')` to locate the block.",
+        "Rename `Constant1` after its function in `bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter` (e.g. for a Gain use `<Signal>_Scale`, for a Sum use `<Output>_Sum`)."
+      ],
+      "refs": [
+        "MAAB jc_0201, ISO 26262-8:2018 \u00a78.4.3"
+      ],
+      "locator": "hilite_system('bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter/Constant1')",
+      "evidence": {
+        "facts_used": [
+          "blk.name",
+          "blk.parent",
+          "blk.path",
+          "blk.type"
+        ],
+        "values": {
+          "path": "bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter/Constant1",
+          "name": "Constant1",
+          "type": "Constant",
+          "parent": "bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter"
+        }
+      }
+    },
+    {
+      "id": "F-010",
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "Default-named block `Constant1` (Constant) at bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter1/Constant1",
+      "reasoning": "`bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter1/Constant1` keeps Simulink's auto-generated name `Constant1`. Inside `bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter1` this hides what the Constant actually does and breaks requirement-to-implementation traceability that ISO 26262-8 \u00a78.4.3 expects from a production model. MAAB jc_0201 forbids default names.",
+      "recommend": [
+        "`hilite_system('bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter1/Constant1')` to locate the block.",
+        "Rename `Constant1` after its function in `bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter1` (e.g. for a Gain use `<Signal>_Scale`, for a Sum use `<Output>_Sum`)."
+      ],
+      "refs": [
+        "MAAB jc_0201, ISO 26262-8:2018 \u00a78.4.3"
+      ],
+      "locator": "hilite_system('bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter1/Constant1')",
+      "evidence": {
+        "facts_used": [
+          "blk.name",
+          "blk.parent",
+          "blk.path",
+          "blk.type"
+        ],
+        "values": {
+          "path": "bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter1/Constant1",
+          "name": "Constant1",
+          "type": "Constant",
+          "parent": "bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter1"
+        }
+      }
+    },
+    {
+      "id": "F-011",
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "Default-named block `Constant1` (Constant) at bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter2/Constant1",
+      "reasoning": "`bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter2/Constant1` keeps Simulink's auto-generated name `Constant1`. Inside `bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter2` this hides what the Constant actually does and breaks requirement-to-implementation traceability that ISO 26262-8 \u00a78.4.3 expects from a production model. MAAB jc_0201 forbids default names.",
+      "recommend": [
+        "`hilite_system('bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter2/Constant1')` to locate the block.",
+        "Rename `Constant1` after its function in `bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter2` (e.g. for a Gain use `<Signal>_Scale`, for a Sum use `<Output>_Sum`)."
+      ],
+      "refs": [
+        "MAAB jc_0201, ISO 26262-8:2018 \u00a78.4.3"
+      ],
+      "locator": "hilite_system('bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter2/Constant1')",
+      "evidence": {
+        "facts_used": [
+          "blk.name",
+          "blk.parent",
+          "blk.path",
+          "blk.type"
+        ],
+        "values": {
+          "path": "bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter2/Constant1",
+          "name": "Constant1",
+          "type": "Constant",
+          "parent": "bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter2"
+        }
+      }
+    },
+    {
+      "id": "F-012",
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "Default-named block `Gain1` (Gain) at bms_master/Fault_Debounce/Temp_Logic/Gain1",
+      "reasoning": "`bms_master/Fault_Debounce/Temp_Logic/Gain1` keeps Simulink's auto-generated name `Gain1`. Inside `bms_master/Fault_Debounce/Temp_Logic` this hides what the Gain actually does and breaks requirement-to-implementation traceability that ISO 26262-8 \u00a78.4.3 expects from a production model. MAAB jc_0201 forbids default names.",
+      "recommend": [
+        "`hilite_system('bms_master/Fault_Debounce/Temp_Logic/Gain1')` to locate the block.",
+        "Rename `Gain1` after its function in `bms_master/Fault_Debounce/Temp_Logic` (e.g. for a Gain use `<Signal>_Scale`, for a Sum use `<Output>_Sum`)."
+      ],
+      "refs": [
+        "MAAB jc_0201, ISO 26262-8:2018 \u00a78.4.3"
+      ],
+      "locator": "hilite_system('bms_master/Fault_Debounce/Temp_Logic/Gain1')",
+      "evidence": {
+        "facts_used": [
+          "blk.name",
+          "blk.parent",
+          "blk.path",
+          "blk.type"
+        ],
+        "values": {
+          "path": "bms_master/Fault_Debounce/Temp_Logic/Gain1",
+          "name": "Gain1",
+          "type": "Gain",
+          "parent": "bms_master/Fault_Debounce/Temp_Logic"
+        }
+      }
+    },
+    {
+      "id": "F-013",
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "Default-named block `Constant1` (Constant) at bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter/Constant1",
+      "reasoning": "`bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter/Constant1` keeps Simulink's auto-generated name `Constant1`. Inside `bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter` this hides what the Constant actually does and breaks requirement-to-implementation traceability that ISO 26262-8 \u00a78.4.3 expects from a production model. MAAB jc_0201 forbids default names.",
+      "recommend": [
+        "`hilite_system('bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter/Constant1')` to locate the block.",
+        "Rename `Constant1` after its function in `bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter` (e.g. for a Gain use `<Signal>_Scale`, for a Sum use `<Output>_Sum`)."
+      ],
+      "refs": [
+        "MAAB jc_0201, ISO 26262-8:2018 \u00a78.4.3"
+      ],
+      "locator": "hilite_system('bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter/Constant1')",
+      "evidence": {
+        "facts_used": [
+          "blk.name",
+          "blk.parent",
+          "blk.path",
+          "blk.type"
+        ],
+        "values": {
+          "path": "bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter/Constant1",
+          "name": "Constant1",
+          "type": "Constant",
+          "parent": "bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter"
+        }
+      }
+    },
+    {
+      "id": "F-014",
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "Default-named block `Constant1` (Constant) at bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter1/Constant1",
+      "reasoning": "`bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter1/Constant1` keeps Simulink's auto-generated name `Constant1`. Inside `bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter1` this hides what the Constant actually does and breaks requirement-to-implementation traceability that ISO 26262-8 \u00a78.4.3 expects from a production model. MAAB jc_0201 forbids default names.",
+      "recommend": [
+        "`hilite_system('bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter1/Constant1')` to locate the block.",
+        "Rename `Constant1` after its function in `bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter1` (e.g. for a Gain use `<Signal>_Scale`, for a Sum use `<Output>_Sum`)."
+      ],
+      "refs": [
+        "MAAB jc_0201, ISO 26262-8:2018 \u00a78.4.3"
+      ],
+      "locator": "hilite_system('bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter1/Constant1')",
+      "evidence": {
+        "facts_used": [
+          "blk.name",
+          "blk.parent",
+          "blk.path",
+          "blk.type"
+        ],
+        "values": {
+          "path": "bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter1/Constant1",
+          "name": "Constant1",
+          "type": "Constant",
+          "parent": "bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter1"
+        }
+      }
+    },
+    {
+      "id": "F-015",
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "Default-named block `Constant1` (Constant) at bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter2/Constant1",
+      "reasoning": "`bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter2/Constant1` keeps Simulink's auto-generated name `Constant1`. Inside `bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter2` this hides what the Constant actually does and breaks requirement-to-implementation traceability that ISO 26262-8 \u00a78.4.3 expects from a production model. MAAB jc_0201 forbids default names.",
+      "recommend": [
+        "`hilite_system('bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter2/Constant1')` to locate the block.",
+        "Rename `Constant1` after its function in `bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter2` (e.g. for a Gain use `<Signal>_Scale`, for a Sum use `<Output>_Sum`)."
+      ],
+      "refs": [
+        "MAAB jc_0201, ISO 26262-8:2018 \u00a78.4.3"
+      ],
+      "locator": "hilite_system('bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter2/Constant1')",
+      "evidence": {
+        "facts_used": [
+          "blk.name",
+          "blk.parent",
+          "blk.path",
+          "blk.type"
+        ],
+        "values": {
+          "path": "bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter2/Constant1",
+          "name": "Constant1",
+          "type": "Constant",
+          "parent": "bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter2"
+        }
+      }
+    },
+    {
+      "id": "F-016",
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "Default-named block `Gain1` (Gain) at bms_master/Fault_Debounce/Temp_Logic1/Gain1",
+      "reasoning": "`bms_master/Fault_Debounce/Temp_Logic1/Gain1` keeps Simulink's auto-generated name `Gain1`. Inside `bms_master/Fault_Debounce/Temp_Logic1` this hides what the Gain actually does and breaks requirement-to-implementation traceability that ISO 26262-8 \u00a78.4.3 expects from a production model. MAAB jc_0201 forbids default names.",
+      "recommend": [
+        "`hilite_system('bms_master/Fault_Debounce/Temp_Logic1/Gain1')` to locate the block.",
+        "Rename `Gain1` after its function in `bms_master/Fault_Debounce/Temp_Logic1` (e.g. for a Gain use `<Signal>_Scale`, for a Sum use `<Output>_Sum`)."
+      ],
+      "refs": [
+        "MAAB jc_0201, ISO 26262-8:2018 \u00a78.4.3"
+      ],
+      "locator": "hilite_system('bms_master/Fault_Debounce/Temp_Logic1/Gain1')",
+      "evidence": {
+        "facts_used": [
+          "blk.name",
+          "blk.parent",
+          "blk.path",
+          "blk.type"
+        ],
+        "values": {
+          "path": "bms_master/Fault_Debounce/Temp_Logic1/Gain1",
+          "name": "Gain1",
+          "type": "Gain",
+          "parent": "bms_master/Fault_Debounce/Temp_Logic1"
+        }
+      }
+    },
+    {
+      "id": "F-017",
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "Default-named block `Constant1` (Constant) at bms_master/Fault_Debounce/Volt_Curr_Logic/Debounce_Counter/Constant1",
+      "reasoning": "`bms_master/Fault_Debounce/Volt_Curr_Logic/Debounce_Counter/Constant1` keeps Simulink's auto-generated name `Constant1`. Inside `bms_master/Fault_Debounce/Volt_Curr_Logic/Debounce_Counter` this hides what the Constant actually does and breaks requirement-to-implementation traceability that ISO 26262-8 \u00a78.4.3 expects from a production model. MAAB jc_0201 forbids default names.",
+      "recommend": [
+        "`hilite_system('bms_master/Fault_Debounce/Volt_Curr_Logic/Debounce_Counter/Constant1')` to locate the block.",
+        "Rename `Constant1` after its function in `bms_master/Fault_Debounce/Volt_Curr_Logic/Debounce_Counter` (e.g. for a Gain use `<Signal>_Scale`, for a Sum use `<Output>_Sum`)."
+      ],
+      "refs": [
+        "MAAB jc_0201, ISO 26262-8:2018 \u00a78.4.3"
+      ],
+      "locator": "hilite_system('bms_master/Fault_Debounce/Volt_Curr_Logic/Debounce_Counter/Constant1')",
+      "evidence": {
+        "facts_used": [
+          "blk.name",
+          "blk.parent",
+          "blk.path",
+          "blk.type"
+        ],
+        "values": {
+          "path": "bms_master/Fault_Debounce/Volt_Curr_Logic/Debounce_Counter/Constant1",
+          "name": "Constant1",
+          "type": "Constant",
+          "parent": "bms_master/Fault_Debounce/Volt_Curr_Logic/Debounce_Counter"
+        }
+      }
+    },
+    {
+      "id": "F-018",
+      "rule_id": "ARCH-UNCONNECTED-MASTER",
+      "category": "model_arch",
+      "severity": "major",
+      "finding": "Unconnected outport port #1 on bms_master/SoH_Estimator",
+      "reasoning": "Block `bms_master/SoH_Estimator` is a SubSystem sitting inside `bms_master`; its outport port #1 has no incoming/outgoing line. In a safety model this silently propagates 0/NaN at run-time, which MIL test cases cannot detect because the dangling port produces no observable signal. ISO 26262-6 \u00a77.4.4 requires the absence of unintended functions.",
+      "recommend": [
+        "Run `hilite_system('bms_master/SoH_Estimator')` in MATLAB to jump straight to the block.",
+        "Either route a meaningful signal into outport port #1 of `bms_master/SoH_Estimator`, or terminate it explicitly with a Terminator/Ground block so the intent is documented."
+      ],
+      "refs": [
+        "ISO 26262-6:2018 \u00a77.4.4 (a)"
+      ],
+      "locator": "hilite_system('bms_master/SoH_Estimator')",
+      "evidence": {
+        "facts_used": [
+          "port.block_type",
+          "port.parent",
+          "port.path",
+          "port.port",
+          "port.type"
+        ],
+        "values": {
+          "path": "bms_master/SoH_Estimator",
+          "type": "outport",
+          "n": 1,
+          "parent": "bms_master",
+          "btype": "SubSystem"
+        }
+      }
+    },
+    {
+      "id": "F-019",
+      "rule_id": "ARCH-UNCONNECTED-MASTER",
+      "category": "model_arch",
+      "severity": "major",
+      "finding": "Unconnected outport port #2 on bms_master/SoH_Estimator",
+      "reasoning": "Block `bms_master/SoH_Estimator` is a SubSystem sitting inside `bms_master`; its outport port #2 has no incoming/outgoing line. In a safety model this silently propagates 0/NaN at run-time, which MIL test cases cannot detect because the dangling port produces no observable signal. ISO 26262-6 \u00a77.4.4 requires the absence of unintended functions.",
+      "recommend": [
+        "Run `hilite_system('bms_master/SoH_Estimator')` in MATLAB to jump straight to the block.",
+        "Either route a meaningful signal into outport port #2 of `bms_master/SoH_Estimator`, or terminate it explicitly with a Terminator/Ground block so the intent is documented."
+      ],
+      "refs": [
+        "ISO 26262-6:2018 \u00a77.4.4 (a)"
+      ],
+      "locator": "hilite_system('bms_master/SoH_Estimator')",
+      "evidence": {
+        "facts_used": [
+          "port.block_type",
+          "port.parent",
+          "port.path",
+          "port.port",
+          "port.type"
+        ],
+        "values": {
+          "path": "bms_master/SoH_Estimator",
+          "type": "outport",
+          "n": 2,
+          "parent": "bms_master",
+          "btype": "SubSystem"
+        }
+      }
+    },
+    {
+      "id": "F-020",
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "Unconnected outport port on fault_predictor/Predict/window",
+      "reasoning": "`fault_predictor/Predict/window` (Inport) in fault_predictor has a dangling outport port. QM scope, but still worth cleaning up before code generation.",
+      "recommend": [
+        "`hilite_system('fault_predictor/Predict/window')` and either wire the port or terminate it."
+      ],
+      "refs": [],
+      "locator": "hilite_system('fault_predictor/Predict/window')",
+      "evidence": {
+        "facts_used": [
+          "port.block_type",
+          "port.path",
+          "port.type"
+        ],
+        "values": {
+          "path": "fault_predictor/Predict/window",
+          "type": "outport",
+          "btype": "Inport"
+        }
+      }
+    },
+    {
+      "id": "F-021",
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "Unconnected inport port on fault_predictor/Predict/Predict",
+      "reasoning": "`fault_predictor/Predict/Predict` (SubSystem) in fault_predictor has a dangling inport port. QM scope, but still worth cleaning up before code generation.",
+      "recommend": [
+        "`hilite_system('fault_predictor/Predict/Predict')` and either wire the port or terminate it."
+      ],
+      "refs": [],
+      "locator": "hilite_system('fault_predictor/Predict/Predict')",
+      "evidence": {
+        "facts_used": [
+          "port.block_type",
+          "port.path",
+          "port.type"
+        ],
+        "values": {
+          "path": "fault_predictor/Predict/Predict",
+          "type": "inport",
+          "btype": "SubSystem"
+        }
+      }
+    },
+    {
+      "id": "F-022",
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "Unconnected outport port on fault_predictor/Predict/Predict",
+      "reasoning": "`fault_predictor/Predict/Predict` (SubSystem) in fault_predictor has a dangling outport port. QM scope, but still worth cleaning up before code generation.",
+      "recommend": [
+        "`hilite_system('fault_predictor/Predict/Predict')` and either wire the port or terminate it."
+      ],
+      "refs": [],
+      "locator": "hilite_system('fault_predictor/Predict/Predict')",
+      "evidence": {
+        "facts_used": [
+          "port.block_type",
+          "port.path",
+          "port.type"
+        ],
+        "values": {
+          "path": "fault_predictor/Predict/Predict",
+          "type": "outport",
+          "btype": "SubSystem"
+        }
+      }
+    },
+    {
+      "id": "F-023",
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "Unconnected inport port on fault_predictor/Predict/probOutput",
+      "reasoning": "`fault_predictor/Predict/probOutput` (Outport) in fault_predictor has a dangling inport port. QM scope, but still worth cleaning up before code generation.",
+      "recommend": [
+        "`hilite_system('fault_predictor/Predict/probOutput')` and either wire the port or terminate it."
+      ],
+      "refs": [],
+      "locator": "hilite_system('fault_predictor/Predict/probOutput')",
+      "evidence": {
+        "facts_used": [
+          "port.block_type",
+          "port.path",
+          "port.type"
+        ],
+        "values": {
+          "path": "fault_predictor/Predict/probOutput",
+          "type": "inport",
+          "btype": "Outport"
+        }
+      }
+    }
+  ],
+  "trace": [
+    {
+      "pass": 1,
+      "rule_id": "DC-MASTER-DEC-OVER",
+      "category": "dead_code",
+      "source": "dead_code.yaml",
+      "fired": true,
+      "bindings": {
+        "asil": "D",
+        "value": 2.772466539196941,
+        "limit": 0
+      },
+      "facts": [
+        "coverage.bms_master.decision.dead_pct",
+        "policy.component_asil.bms_master",
+        "policy.limits.bms_master.dec"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "DC-MASTER-MCDC-OVER",
+      "category": "dead_code",
+      "source": "dead_code.yaml",
+      "fired": true,
+      "bindings": {
+        "value": 90.2439024390244,
+        "limit": 0
+      },
+      "facts": [
+        "coverage.bms_master.mcdc.dead_pct",
+        "policy.limits.bms_master.mcdc"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Current_Monitor/Gain1",
+        "name": "Gain1",
+        "type": "Gain",
+        "parent": "bms_master/Current_Monitor"
+      },
+      "facts": [
+        "blk.name",
+        "blk.parent",
+        "blk.path",
+        "blk.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Current_Monitor/Gain2",
+        "name": "Gain2",
+        "type": "Gain",
+        "parent": "bms_master/Current_Monitor"
+      },
+      "facts": [
+        "blk.name",
+        "blk.parent",
+        "blk.path",
+        "blk.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Current_Monitor/Switch1",
+        "name": "Switch1",
+        "type": "Switch",
+        "parent": "bms_master/Current_Monitor"
+      },
+      "facts": [
+        "blk.name",
+        "blk.parent",
+        "blk.path",
+        "blk.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Current_Monitor/Switch2",
+        "name": "Switch2",
+        "type": "Switch",
+        "parent": "bms_master/Current_Monitor"
+      },
+      "facts": [
+        "blk.name",
+        "blk.parent",
+        "blk.path",
+        "blk.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Fault_Debounce/Constant1",
+        "name": "Constant1",
+        "type": "Constant",
+        "parent": "bms_master/Fault_Debounce"
+      },
+      "facts": [
+        "blk.name",
+        "blk.parent",
+        "blk.path",
+        "blk.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Fault_Debounce/Constant2",
+        "name": "Constant2",
+        "type": "Constant",
+        "parent": "bms_master/Fault_Debounce"
+      },
+      "facts": [
+        "blk.name",
+        "blk.parent",
+        "blk.path",
+        "blk.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter/Constant1",
+        "name": "Constant1",
+        "type": "Constant",
+        "parent": "bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter"
+      },
+      "facts": [
+        "blk.name",
+        "blk.parent",
+        "blk.path",
+        "blk.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter1/Constant1",
+        "name": "Constant1",
+        "type": "Constant",
+        "parent": "bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter1"
+      },
+      "facts": [
+        "blk.name",
+        "blk.parent",
+        "blk.path",
+        "blk.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter2/Constant1",
+        "name": "Constant1",
+        "type": "Constant",
+        "parent": "bms_master/Fault_Debounce/Temp_Logic/Debounce_Counter2"
+      },
+      "facts": [
+        "blk.name",
+        "blk.parent",
+        "blk.path",
+        "blk.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Fault_Debounce/Temp_Logic/Gain1",
+        "name": "Gain1",
+        "type": "Gain",
+        "parent": "bms_master/Fault_Debounce/Temp_Logic"
+      },
+      "facts": [
+        "blk.name",
+        "blk.parent",
+        "blk.path",
+        "blk.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter/Constant1",
+        "name": "Constant1",
+        "type": "Constant",
+        "parent": "bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter"
+      },
+      "facts": [
+        "blk.name",
+        "blk.parent",
+        "blk.path",
+        "blk.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter1/Constant1",
+        "name": "Constant1",
+        "type": "Constant",
+        "parent": "bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter1"
+      },
+      "facts": [
+        "blk.name",
+        "blk.parent",
+        "blk.path",
+        "blk.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter2/Constant1",
+        "name": "Constant1",
+        "type": "Constant",
+        "parent": "bms_master/Fault_Debounce/Temp_Logic1/Debounce_Counter2"
+      },
+      "facts": [
+        "blk.name",
+        "blk.parent",
+        "blk.path",
+        "blk.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Fault_Debounce/Temp_Logic1/Gain1",
+        "name": "Gain1",
+        "type": "Gain",
+        "parent": "bms_master/Fault_Debounce/Temp_Logic1"
+      },
+      "facts": [
+        "blk.name",
+        "blk.parent",
+        "blk.path",
+        "blk.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Fault_Debounce/Volt_Curr_Logic/Debounce_Counter/Constant1",
+        "name": "Constant1",
+        "type": "Constant",
+        "parent": "bms_master/Fault_Debounce/Volt_Curr_Logic/Debounce_Counter"
+      },
+      "facts": [
+        "blk.name",
+        "blk.parent",
+        "blk.path",
+        "blk.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-UNCONNECTED-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/SoH_Estimator",
+        "type": "outport",
+        "n": 1,
+        "parent": "bms_master",
+        "btype": "SubSystem"
+      },
+      "facts": [
+        "port.block_type",
+        "port.parent",
+        "port.path",
+        "port.port",
+        "port.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-UNCONNECTED-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/SoH_Estimator",
+        "type": "outport",
+        "n": 2,
+        "parent": "bms_master",
+        "btype": "SubSystem"
+      },
+      "facts": [
+        "port.block_type",
+        "port.parent",
+        "port.path",
+        "port.port",
+        "port.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "fault_predictor/Predict/window",
+        "type": "outport",
+        "btype": "Inport"
+      },
+      "facts": [
+        "port.block_type",
+        "port.path",
+        "port.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "fault_predictor/Predict/Predict",
+        "type": "inport",
+        "btype": "SubSystem"
+      },
+      "facts": [
+        "port.block_type",
+        "port.path",
+        "port.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "fault_predictor/Predict/Predict",
+        "type": "outport",
+        "btype": "SubSystem"
+      },
+      "facts": [
+        "port.block_type",
+        "port.path",
+        "port.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "fault_predictor/Predict/probOutput",
+        "type": "inport",
+        "btype": "Outport"
+      },
+      "facts": [
+        "port.block_type",
+        "port.path",
+        "port.type"
+      ]
+    }
+  ]
+}

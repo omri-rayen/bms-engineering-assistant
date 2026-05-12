@@ -1,0 +1,214 @@
+# MIL / SIL / PIL validation result rules.
+#
+# These look at the JSON reports written by validator/+mil, +sil, +pil.
+# Two flavours of rule:
+#   - "any failure" rules that flag the phase as soon as a single test
+#     fails or errors (cheap, always useful);
+#   - "headroom" rules on the PIL numerics (WCET, RAM, predictor error)
+#     that warn when we are getting close to the budget BEFORE we trip
+#     the validator's hard pass/fail.
+#
+# Phase-missing cases (e.g. user has not run sil yet) silently skip --
+# `validation.<phase>.present` is False and the comparisons return False.
+
+rules:
+
+  # -------- MIL ---------------------------------------------------------
+  - id: VAL-MIL-MISSING
+    category: validation
+    when: validation.mil.status == "missing"
+    severity: info
+    finding: "MIL report not found -- mil.run has not been executed yet"
+    reasoning: >
+      The analyzer can only judge MIL once a report is on disk.
+    recommend:
+      - "Run mil.run from MATLAB and re-run the analyzer."
+
+  - id: VAL-MIL-FAIL
+    category: validation
+    when: validation.mil.present and (validation.mil.fail > 0 or validation.mil.error > 0)
+    bind:
+      total:    validation.mil.total
+      passed:   validation.mil.passed
+      failed:   validation.mil.fail
+      errored:  validation.mil.error
+      failing:  validation.mil.failing_tests
+    severity: critical
+    finding: "MIL: {failed} fail / {errored} error out of {total} tests ({failing})"
+    reasoning: >
+      A failing MIL test means the model does not meet a low-level
+      requirement against the virtual plant. Nothing downstream (SIL,
+      PIL, coverage) is meaningful until MIL is green.
+    recommend:
+      - "Open the MIL report, look at the named test(s), fix the model
+         or the test data, then re-run mil.run."
+    refs: ["validator/reports/MIL.json"]
+
+  # -------- SIL ---------------------------------------------------------
+  - id: VAL-SIL-MISSING
+    category: validation
+    when: validation.sil.status == "missing"
+    severity: info
+    finding: "SIL report not found -- sil.run has not been executed yet"
+    reasoning: >
+      Without a SIL run we cannot confirm that the generated C-code
+      behaves like the model.
+    recommend:
+      - "Run sil.run from MATLAB."
+
+  - id: VAL-SIL-FAIL
+    category: validation
+    when: validation.sil.present and (validation.sil.fail > 0 or validation.sil.error > 0)
+    bind:
+      total:    validation.sil.total
+      failed:   validation.sil.fail
+      errored:  validation.sil.error
+      failing:  validation.sil.failing_tests
+    severity: critical
+    finding: "SIL: {failed} fail / {errored} error out of {total} tests ({failing})"
+    reasoning: >
+      A SIL miss means the generated C-code diverges from the Simulink
+      model by more than the equivalence tolerance. This points at a
+      code-generation artefact (datatype, overflow, fixed-point) and
+      MUST be resolved before PIL.
+    recommend:
+      - "Compare MIL vs SIL signals for the failing requirement; isolate
+         the first divergence with validator/compare/."
+      - "Check Embedded Coder build settings: BuildConfiguration, target
+         word size, math library, integer overflow handling."
+    refs: ["validator/reports/SIL.json", "ISO 26262-6:2018, table 9"]
+
+  # -------- PIL: pass/fail rollup ---------------------------------------
+  - id: VAL-PIL-MISSING
+    category: validation
+    when: validation.pil.status == "missing"
+    severity: info
+    finding: "PIL report not found -- pil.run has not been executed yet"
+    reasoning: >
+      PIL evidence is required before claiming the BMS works on the
+      target STM32H7A3.
+    recommend:
+      - "Connect the Nucleo board (COM3) and run pil.run from MATLAB."
+
+  - id: VAL-PIL-FAIL
+    category: validation
+    when: validation.pil.present and (validation.pil.fail > 0 or validation.pil.error > 0)
+    bind:
+      total:    validation.pil.total
+      failed:   validation.pil.fail
+      errored:  validation.pil.error
+      failing:  validation.pil.failing_tests
+    severity: critical
+    finding: "PIL: {failed} fail / {errored} error out of {total} tests ({failing})"
+    reasoning: >
+      A PIL failure is the latest-stage signal we have: either timing,
+      memory or numerics is off on the real MCU. Treat as blocking.
+    recommend:
+      - "Look at the named requirement in PIL.json -- WCET, RAM and
+         predictor error each have a separate diagnostic path."
+    refs: ["validator/reports/PIL.json"]
+
+  # -------- PIL: WCET headroom -----------------------------------------
+  - id: VAL-PIL-WCET-OVER
+    category: validation
+    when: validation.pil.wcet_us > policy.pil.wcet_us_max
+    bind:
+      value: validation.pil.wcet_us
+      limit: policy.pil.wcet_us_max
+    severity: critical
+    finding: "PIL WCET = {value:.0f} us exceeds budget {limit:.0f} us"
+    reasoning: >
+      Per-step WCET is above the 10 % CPU-load budget at the 100 ms BMS
+      tick. The control loop will miss its deadline on the target.
+    recommend:
+      - "Profile the slowest step (Embedded Coder Detailed profiling)."
+      - "Move the LSTM inference to a slower derived rate, or reduce
+         predictor sequence length."
+    refs: ["REQ-LL-RT-WCET-01"]
+
+  - id: VAL-PIL-WCET-WARN
+    category: validation
+    when: >
+      validation.pil.wcet_us > policy.pil.wcet_us_warn
+      and validation.pil.wcet_us <= policy.pil.wcet_us_max
+    bind:
+      value: validation.pil.wcet_us
+      warn:  policy.pil.wcet_us_warn
+      limit: policy.pil.wcet_us_max
+    severity: minor
+    finding: "PIL WCET = {value:.0f} us is above warn line {warn:.0f} us (budget {limit:.0f} us)"
+    reasoning: >
+      Still within budget, but headroom is shrinking. New features will
+      eat the remaining margin quickly.
+    recommend:
+      - "Track WCET over the next few releases; add an instrumented PIL
+         run after every model change touching the master pipeline."
+    refs: ["REQ-LL-RT-WCET-01"]
+
+  # -------- PIL: RAM footprint -----------------------------------------
+  - id: VAL-PIL-RAM-OVER
+    category: validation
+    when: validation.pil.ram_kb > policy.pil.ram_kb_max
+    bind:
+      value: validation.pil.ram_kb
+      limit: policy.pil.ram_kb_max
+    severity: critical
+    finding: "PIL static RAM = {value:.1f} kB exceeds budget {limit} kB"
+    reasoning: >
+      .data + .bss is past the budget; we are about to crowd out the
+      HAL, the FreeRTOS-style stack and the PIL transport buffers.
+    recommend:
+      - "Drop unused LSTM weights / quantize, or move const tables to
+         flash with a custom storage class."
+    refs: ["REQ-LL-RT-RAM-01"]
+
+  - id: VAL-PIL-RAM-WARN
+    category: validation
+    when: >
+      validation.pil.ram_kb > policy.pil.ram_kb_warn
+      and validation.pil.ram_kb <= policy.pil.ram_kb_max
+    bind:
+      value: validation.pil.ram_kb
+      warn:  policy.pil.ram_kb_warn
+      limit: policy.pil.ram_kb_max
+    severity: minor
+    finding: "PIL RAM = {value:.1f} kB above warn line {warn} kB (budget {limit} kB)"
+    reasoning: "RAM growth is approaching the budget."
+    recommend:
+      - "Audit the largest static buffers with arm-none-eabi-nm --size-sort."
+    refs: ["REQ-LL-RT-RAM-01"]
+
+  # -------- PIL: LSTM numerics on target -------------------------------
+  - id: VAL-PIL-PRED-OVER
+    category: validation
+    when: validation.pil.predictor_max_abs_err > policy.pil.predictor_max_abs_err_max
+    bind:
+      value: validation.pil.predictor_max_abs_err
+      limit: policy.pil.predictor_max_abs_err_max
+    severity: critical
+    finding: "PIL predictor max abs err = {value:.4g} exceeds budget {limit:.4g}"
+    reasoning: >
+      The on-target LSTM prob_3 outputs diverge from MIL by more than
+      the allowed 1e-3. Almost always a memory layout or floating-point
+      configuration issue.
+    recommend:
+      - "Check that the ONNX import wrote weights in the same order the
+         hand-rolled LSTM kernel expects."
+      - "Verify FPU configuration on the H7 (FPU lazy stacking, single
+         vs double precision)."
+    refs: ["REQ-LL-PIL-PRD-01"]
+
+  - id: VAL-PIL-PRED-WARN
+    category: validation
+    when: >
+      validation.pil.predictor_max_abs_err > policy.pil.predictor_max_abs_err_warn
+      and validation.pil.predictor_max_abs_err <= policy.pil.predictor_max_abs_err_max
+    bind:
+      value: validation.pil.predictor_max_abs_err
+      warn:  policy.pil.predictor_max_abs_err_warn
+    severity: minor
+    finding: "PIL predictor max abs err = {value:.4g} above warn line {warn:.4g}"
+    reasoning: "Numerics on target are drifting closer to the limit."
+    recommend:
+      - "Compare prob_3 traces sample-by-sample on the longest test trip."
+    refs: ["REQ-LL-PIL-PRD-01"]

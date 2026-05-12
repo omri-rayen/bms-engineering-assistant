@@ -1,0 +1,51 @@
+# asil_policy.yaml -- single source of truth for thresholds + WIP scope.
+#
+# Rules in dead_code.yaml / model_arch.yaml only consult this file -- they
+# never hard-code numbers. Edit here to tune what the analyzer considers
+# acceptable.
+
+# Per-model ASIL classification (worst-case across the safety functions
+# implemented in that model).
+component_asil:
+  bms_master:      D
+  bms_slave:       C
+  fault_predictor: QM
+
+# Coverage gates per safety class. Values are "% dead" allowed before a
+# rule fires. ISO 26262-6:2018 Table 12 strongly recommends MC/DC for
+# ASIL D and decision coverage for ASIL C/D -- the numbers below reflect
+# that reading with a small operational margin where the standard allows
+# documented justification (§9.4.5).
+limits:
+  bms_master:      {exec: 0, dec: 0,  cond: 0,   mcdc: 5}
+  bms_slave:       {exec: 0, dec: 1,  cond: 5,   mcdc: 50}
+  fault_predictor: {exec: 5, dec: 25, cond: 50,  mcdc: 100}
+
+# Generic model-architecture limits (used by model_arch.yaml).
+arch:
+  depth_max:           5
+  cyclomatic_max:      30
+  large_subsys_blocks: 100
+  max_distinct_rates:  4
+  max_chart_states:    20
+  atomic_max_in:       8
+  atomic_max_out:      6
+  mlfn_max_loc:        80
+  mlfn_max_nesting:    4
+
+# WIP allowlist -- any finding whose `path` starts with one of these
+# prefixes is downranked to `info` and tagged `wip: true`. Use this to
+# acknowledge in-progress subsystems so they do not dominate the digest.
+wip_paths:
+  - "bms_master/SoH_Estimator"
+  - "bms_master/ EKF_SoC_Estimator"
+  - "fault_predictor/Predict"
+
+# PIL real-time + footprint budgets (used by validation.yaml).
+pil:
+  wcet_us_max:                   10000
+  wcet_us_warn:                   7500
+  ram_kb_max:                      256
+  ram_kb_warn:                     200
+  predictor_max_abs_err_max:     0.001
+  predictor_max_abs_err_warn:    0.0005

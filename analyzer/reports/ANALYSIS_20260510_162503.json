@@ -1,0 +1,243 @@
+{
+  "schema_version": "1.0",
+  "timestamp": "20260510_162503",
+  "inputs": {
+    "facts": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\analyzer\\reports\\FACTS.json",
+    "coverage": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\COV.json",
+    "mil": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\MIL.json",
+    "sil": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\SIL.json",
+    "pil": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\PIL.json",
+    "requirements": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\requirements\\requirements.json"
+  },
+  "summary": {
+    "n_findings": 5,
+    "by_severity": {
+      "info": 4,
+      "minor": 0,
+      "major": 1,
+      "critical": 0
+    },
+    "by_category": {
+      "dead_code": 1,
+      "model_arch": 4
+    },
+    "verdict": "review_required"
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "rule_id": "COV-SLAVE-DEC",
+      "category": "dead_code",
+      "severity": "major",
+      "wip": false,
+      "finding": "bms_slave decision coverage gap = 51.25% (ASIL C, limit 1%)",
+      "reasoning": "Branch coverage is highly recommended for ASIL C. The bms_slave MIL stimulus does not exercise both directions of every decision.",
+      "recommend": [
+        "Identify the failing decisions in the Coverage Report and add driving stimulus, or justify with \u00a79.4.5."
+      ],
+      "refs": [
+        "ISO 26262-6:2018 Table 12 (branch coverage, ASIL C = ++)"
+      ],
+      "locator": "",
+      "evidence": {
+        "facts_used": [
+          "coverage.bms_slave.decision.dead_pct",
+          "policy.limits.bms_slave.dec"
+        ],
+        "values": {
+          "value": 51.25,
+          "limit": 1
+        }
+      }
+    },
+    {
+      "id": "F-002",
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "severity": "info",
+      "wip": true,
+      "finding": "Unconnected outport port on fault_predictor/Predict/window",
+      "reasoning": "`fault_predictor/Predict/window` (Inport) in fault_predictor has a dangling outport port. QM scope, but worth tidying before deployment.",
+      "recommend": [
+        "Wire the port or terminate it."
+      ],
+      "refs": [],
+      "locator": "hilite_system('fault_predictor/Predict/window')",
+      "evidence": {
+        "facts_used": [
+          "port.block_type",
+          "port.path",
+          "port.type"
+        ],
+        "values": {
+          "path": "fault_predictor/Predict/window",
+          "type": "outport",
+          "btype": "Inport"
+        }
+      }
+    },
+    {
+      "id": "F-003",
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "severity": "info",
+      "wip": true,
+      "finding": "Unconnected inport port on fault_predictor/Predict/Predict",
+      "reasoning": "`fault_predictor/Predict/Predict` (SubSystem) in fault_predictor has a dangling inport port. QM scope, but worth tidying before deployment.",
+      "recommend": [
+        "Wire the port or terminate it."
+      ],
+      "refs": [],
+      "locator": "hilite_system('fault_predictor/Predict/Predict')",
+      "evidence": {
+        "facts_used": [
+          "port.block_type",
+          "port.path",
+          "port.type"
+        ],
+        "values": {
+          "path": "fault_predictor/Predict/Predict",
+          "type": "inport",
+          "btype": "SubSystem"
+        }
+      }
+    },
+    {
+      "id": "F-004",
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "severity": "info",
+      "wip": true,
+      "finding": "Unconnected outport port on fault_predictor/Predict/Predict",
+      "reasoning": "`fault_predictor/Predict/Predict` (SubSystem) in fault_predictor has a dangling outport port. QM scope, but worth tidying before deployment.",
+      "recommend": [
+        "Wire the port or terminate it."
+      ],
+      "refs": [],
+      "locator": "hilite_system('fault_predictor/Predict/Predict')",
+      "evidence": {
+        "facts_used": [
+          "port.block_type",
+          "port.path",
+          "port.type"
+        ],
+        "values": {
+          "path": "fault_predictor/Predict/Predict",
+          "type": "outport",
+          "btype": "SubSystem"
+        }
+      }
+    },
+    {
+      "id": "F-005",
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "severity": "info",
+      "wip": true,
+      "finding": "Unconnected inport port on fault_predictor/Predict/probOutput",
+      "reasoning": "`fault_predictor/Predict/probOutput` (Outport) in fault_predictor has a dangling inport port. QM scope, but worth tidying before deployment.",
+      "recommend": [
+        "Wire the port or terminate it."
+      ],
+      "refs": [],
+      "locator": "hilite_system('fault_predictor/Predict/probOutput')",
+      "evidence": {
+        "facts_used": [
+          "port.block_type",
+          "port.path",
+          "port.type"
+        ],
+        "values": {
+          "path": "fault_predictor/Predict/probOutput",
+          "type": "inport",
+          "btype": "Outport"
+        }
+      }
+    }
+  ],
+  "trace": [
+    {
+      "pass": 1,
+      "rule_id": "COV-SLAVE-DEC",
+      "category": "dead_code",
+      "source": "dead_code.yaml",
+      "fired": true,
+      "bindings": {
+        "value": 51.25,
+        "limit": 1
+      },
+      "facts": [
+        "coverage.bms_slave.decision.dead_pct",
+        "policy.limits.bms_slave.dec"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "fault_predictor/Predict/window",
+        "type": "outport",
+        "btype": "Inport"
+      },
+      "facts": [
+        "port.block_type",
+        "port.path",
+        "port.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "fault_predictor/Predict/Predict",
+        "type": "inport",
+        "btype": "SubSystem"
+      },
+      "facts": [
+        "port.block_type",
+        "port.path",
+        "port.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "fault_predictor/Predict/Predict",
+        "type": "outport",
+        "btype": "SubSystem"
+      },
+      "facts": [
+        "port.block_type",
+        "port.path",
+        "port.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "fault_predictor/Predict/probOutput",
+        "type": "inport",
+        "btype": "Outport"
+      },
+      "facts": [
+        "port.block_type",
+        "port.path",
+        "port.type"
+      ]
+    }
+  ]
+}

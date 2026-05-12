@@ -1,8 +1,6 @@
 function [X, Y, meta] = run_and_extract(mdl, trip, scen)
-% Run one MIL simulation and turn the outputs into features + look-ahead labels.
-% Pulls warn-level thresholds and look-ahead horizons from the base
-% workspace (init_system.m). The predictor must fire BEFORE the warn-level
-% fault flag, so labels are anchored to warn crossings, not shutdown.
+% Run one MIL sim and return features (X) + look-ahead labels (Y).
+% Labels are anchored to warn-crossing, not shutdown.
 
 bms       = evalin('base', 'bms');
 predictor = evalin('base', 'predictor');
@@ -77,8 +75,7 @@ X = single([Vmin(1:N), Vmax(1:N), SoC(1:N), ...
             Tmax(1:N), Tcool(1:N), Ipack(1:N), ...
             dVmin(1:N), dTmax(1:N)]);
 
-% Look-ahead labels: 1 if the threshold is crossed within H samples ahead.
-% Only the scenario's target fault is positive; other channels stay zero.
+% look-ahead labels (only the injected fault class is positive)
 y_OT = false(N,1);
 y_OV = false(N,1);
 y_UV = false(N,1);

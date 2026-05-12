@@ -11,6 +11,7 @@ p.addParameter('filter',    '');
 p.addParameter('verbose',   true);
 p.addParameter('outFile',   '');
 p.addParameter('testsRoot', '');
+p.addParameter('on_test',   []);
 p.parse(varargin{:});
 opt = p.Results;
 
@@ -29,7 +30,10 @@ if evalin('base', '~exist(''bms'',''var'')')
     evalin('base', sprintf('run(''%s'')', initFile));
 end
 
-if ~opt.skip_build
+if opt.skip_build
+    fprintf('[sil] skip_build=1 -> reusing existing SIL artifacts (no rtwbuild)\n');
+else
+    fprintf('[sil] skip_build=0 -> running sil.build(%s) (rebuild)\n', opt.mdl);
     sil.build(opt.mdl);
 end
 
@@ -43,10 +47,13 @@ for f = 1:numel(files)
     end
     if opt.verbose, fprintf('  [sil] %-44s ', fn); end
     snap = val.snapshot_ws();
+    setappdata(0, 'val_last_sims', {});
     t0 = tic;
+    captured = '';
     try
-        r = feval(fn);
+        captured = evalc('r = feval(fn);');
     catch ME
+        if ~isempty(captured), fprintf(2, '%s\n', captured); end
         r = val.new_result("sil", string(fn), string(fn), "");
         r.status = "error";
         r.error  = string(ME.message);
@@ -57,6 +64,9 @@ for f = 1:numel(files)
     val.restore_ws(snap);
     if opt.verbose, fprintf('%-7s  (%.2fs)\n', upper(r.status), r.duration_s); end
     results(end+1, 1) = r; %#ok<AGROW>
+    if ~isempty(opt.on_test)
+        try, opt.on_test(struct('suite',"sil",'name',string(fn),'status',string(r.status),'duration_s',r.duration_s)); catch, end
+    end
 end
 
 report.timestamp = string(datetime('now','Format','yyyyMMdd_HHmmss'));

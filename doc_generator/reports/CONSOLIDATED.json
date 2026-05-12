@@ -1,0 +1,212 @@
+{
+  "project": {
+    "name": "BMS Engineering Assistant",
+    "system": "EV battery, 96s1p Samsung-SDI, 1 master + 8 slaves",
+    "asil": "ASIL D context (per ISO 26262-6:2018)",
+    "predictor": "Embedded LSTM fault predictor"
+  },
+  "full_report": "FULL_REPORT.json",
+  "mil": {
+    "ref": "/validation/mil",
+    "summary": {
+      "total": 5,
+      "pass": 5,
+      "fail": 0,
+      "error": 0,
+      "skipped": 0,
+      "pass_rate_pct": 100.0
+    },
+    "tests": [
+      {
+        "req_id": "REQ-LL-PRD-DR-01",
+        "name": "Per-class predictor detection rate",
+        "status": "pass",
+        "ref": "/validation/mil/results/0"
+      },
+      {
+        "req_id": "REQ-LL-PRD-FAR-01",
+        "name": "Predictor false-alarm rate on nominal trips",
+        "status": "pass",
+        "ref": "/validation/mil/results/1"
+      },
+      {
+        "req_id": "REQ-LL-PRD-LT-01",
+        "name": "OT median alarm lead-time vs warn",
+        "status": "pass",
+        "ref": "/validation/mil/results/2"
+      },
+      {
+        "req_id": "REQ-LL-PRD-LT-02",
+        "name": "OV median alarm lead-time vs warn",
+        "status": "pass",
+        "ref": "/validation/mil/results/3"
+      },
+      {
+        "req_id": "REQ-LL-PRD-LT-03",
+        "name": "UV median alarm lead-time vs warn",
+        "status": "pass",
+        "ref": "/validation/mil/results/4"
+      }
+    ]
+  },
+  "sil": {
+    "ref": "/validation/sil",
+    "not_run": true,
+    "summary": {
+      "total": 0,
+      "pass": 0,
+      "fail": 0,
+      "error": 0,
+      "skipped": 0,
+      "pass_rate_pct": 0.0
+    },
+    "tests": []
+  },
+  "pil": {
+    "ref": "/validation/pil",
+    "summary": {
+      "total": 1,
+      "pass": 1,
+      "fail": 0,
+      "error": 0,
+      "skipped": 0,
+      "pass_rate_pct": 100.0
+    },
+    "tests": [
+      {
+        "req_id": "REQ-LL-PIL-PRD-01",
+        "name": "LSTM prob_3 PIL vs MIL equivalence",
+        "status": "pass",
+        "ref": "/validation/pil/results",
+        "checks": [
+          {
+            "name": "prob3_pil_matches_mil",
+            "status": "pass",
+            "value": 1.1920928955078125e-07,
+            "threshold": 0.001,
+            "ref": "/validation/pil/results/checks"
+          }
+        ]
+      }
+    ]
+  },
+  "analysis": {
+    "ref": "/analysis",
+    "summary": {
+      "n_findings": 8,
+      "by_severity": {
+        "info": 4,
+        "minor": 0,
+        "major": 3,
+        "critical": 1
+      },
+      "by_category": {
+        "dead_code": 4,
+        "model_arch": 4
+      },
+      "verdict": "blocking"
+    },
+    "rules": [
+      {
+        "rule_id": "COV-MASTER-DEC",
+        "category": "dead_code",
+        "severity": "critical",
+        "count": 1,
+        "wip_any": false,
+        "finding": "bms_master decision coverage gap = 51.53% (ASIL D, limit 0%)",
+        "reasoning": "Decision coverage is highly recommended for ASIL D. A non-zero gap means at least one if/Switch/relational has only been exercised in one d\u2026",
+        "recommend": [
+          "Coverage Report > Decision metric: each '<100%' decision lists which outcome (true/false) is missing."
+        ],
+        "refs": [
+          "/analysis/findings/1"
+        ]
+      },
+      {
+        "rule_id": "COV-MASTER-COND",
+        "category": "dead_code",
+        "severity": "major",
+        "count": 1,
+        "wip_any": false,
+        "finding": "bms_master condition coverage gap = 23.50% (ASIL D, limit 0%)",
+        "reasoning": "Condition coverage is the per-operand cousin of decision coverage: every Boolean sub-expression must take both true and false values. Gaps\u2026",
+        "recommend": [
+          "Inspect the AND/OR fan-in of the failing predicate; reorder or simplify when one operand is provably invarian\u2026"
+        ],
+        "refs": [
+          "/analysis/findings/0"
+        ]
+      },
+      {
+        "rule_id": "COV-MASTER-MCDC",
+        "category": "dead_code",
+        "severity": "major",
+        "count": 1,
+        "wip_any": false,
+        "finding": "bms_master MC/DC coverage gap = 90.24% (ASIL D, limit 5%)",
+        "reasoning": "MC/DC is highly recommended for ASIL D. Each independent operand of every decision must demonstrate that it can flip the outcome on its own\u2026",
+        "recommend": [
+          "For each uncovered MC/DC pair, decide between (a) adding a driving stimulus, (b) refactoring the predicate to\u2026"
+        ],
+        "refs": [
+          "/analysis/findings/2"
+        ]
+      },
+      {
+        "rule_id": "COV-SLAVE-DEC",
+        "category": "dead_code",
+        "severity": "major",
+        "count": 1,
+        "wip_any": false,
+        "finding": "bms_slave decision coverage gap = 45.00% (ASIL C, limit 1%)",
+        "reasoning": "Branch coverage is highly recommended for ASIL C. The bms_slave MIL stimulus does not exercise both directions of every decision.",
+        "recommend": [
+          "Identify the failing decisions in the Coverage Report and add driving stimulus, or justify with \u00a79.4.5."
+        ],
+        "refs": [
+          "/analysis/findings/3"
+        ]
+      },
+      {
+        "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+        "category": "model_arch",
+        "severity": "info",
+        "count": 4,
+        "wip_any": true,
+        "finding": "Unconnected outport port on fault_predictor/Predict/window",
+        "reasoning": "`fault_predictor/Predict/window` (Inport) in fault_predictor has a dangling outport port. QM scope, but worth tidying before deployment.",
+        "recommend": [
+          "Wire the port or terminate it."
+        ],
+        "refs": [
+          "/analysis/findings/4",
+          "/analysis/findings/5",
+          "/analysis/findings/6"
+        ]
+      }
+    ]
+  },
+  "kpis": {
+    "tests_total": 6,
+    "tests_passed": 6,
+    "tests_failed": 0,
+    "pass_rate_pct": {
+      "mil": 100.0,
+      "pil": 100.0
+    },
+    "suites_run": [
+      "mil",
+      "pil"
+    ],
+    "findings_total": 8,
+    "findings_by_sev": {
+      "info": 4,
+      "minor": 0,
+      "major": 3,
+      "critical": 1
+    },
+    "findings_critical": 1,
+    "findings_major": 3,
+    "verdict": "blocking"
+  }
+}

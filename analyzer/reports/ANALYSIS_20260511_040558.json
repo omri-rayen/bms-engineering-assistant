@@ -1,0 +1,366 @@
+{
+  "schema_version": "1.0",
+  "timestamp": "20260511_040558",
+  "inputs": {
+    "facts": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\analyzer\\reports\\FACTS.json",
+    "coverage": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\COV.json",
+    "mil": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\MIL.json",
+    "sil": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\SIL.json",
+    "pil": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\PIL.json",
+    "requirements": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\requirements\\requirements.json"
+  },
+  "summary": {
+    "n_findings": 8,
+    "by_severity": {
+      "info": 4,
+      "minor": 0,
+      "major": 3,
+      "critical": 1
+    },
+    "by_category": {
+      "dead_code": 4,
+      "model_arch": 4
+    },
+    "verdict": "blocking"
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "rule_id": "COV-MASTER-COND",
+      "category": "dead_code",
+      "severity": "major",
+      "wip": false,
+      "finding": "bms_master condition coverage gap = 23.50% (ASIL D, limit 0%)",
+      "reasoning": "Condition coverage is the per-operand cousin of decision coverage: every Boolean sub-expression must take both true and false values. Gaps usually indicate dead operands inside compound predicates.",
+      "recommend": [
+        "Inspect the AND/OR fan-in of the failing predicate; reorder or simplify when one operand is provably invariant."
+      ],
+      "refs": [],
+      "locator": "",
+      "evidence": {
+        "facts_used": [
+          "coverage.bms_master.condition.dead_pct",
+          "policy.limits.bms_master.cond"
+        ],
+        "values": {
+          "value": 23.50119904076739,
+          "limit": 0
+        }
+      }
+    },
+    {
+      "id": "F-002",
+      "rule_id": "COV-MASTER-DEC",
+      "category": "dead_code",
+      "severity": "critical",
+      "wip": false,
+      "finding": "bms_master decision coverage gap = 51.53% (ASIL D, limit 0%)",
+      "reasoning": "Decision coverage is highly recommended for ASIL D. A non-zero gap means at least one if/Switch/relational has only been exercised in one direction by MIL.",
+      "recommend": [
+        "Coverage Report > Decision metric: each '<100%' decision lists which outcome (true/false) is missing.",
+        "Add the missing-direction stimulus to MIL, or filter the decision with a \u00a79.4.5 rationale (typically a defensive branch that cannot occur on the integration target)."
+      ],
+      "refs": [
+        "ISO 26262-6:2018 Table 12 (branch coverage, ASIL D = ++)"
+      ],
+      "locator": "",
+      "evidence": {
+        "facts_used": [
+          "coverage.bms_master.decision.dead_pct",
+          "policy.limits.bms_master.dec"
+        ],
+        "values": {
+          "value": 51.52963671128107,
+          "limit": 0
+        }
+      }
+    },
+    {
+      "id": "F-003",
+      "rule_id": "COV-MASTER-MCDC",
+      "category": "dead_code",
+      "severity": "major",
+      "wip": false,
+      "finding": "bms_master MC/DC coverage gap = 90.24% (ASIL D, limit 5%)",
+      "reasoning": "MC/DC is highly recommended for ASIL D. Each independent operand of every decision must demonstrate that it can flip the outcome on its own. Achieving 100% on legacy logic is rarely practical; ISO 26262-6 \u00a79.4.5 explicitly allows incomplete coverage if the gap is justified -- this rule fires above 5% so the remaining cases get a written rationale rather than silently ignored.",
+      "recommend": [
+        "For each uncovered MC/DC pair, decide between (a) adding a driving stimulus, (b) refactoring the predicate to remove masked operands, or (c) accepting the gap with a \u00a79.4.5 justification recorded in the safety case."
+      ],
+      "refs": [
+        "ISO 26262-6:2018 Table 12 (MC/DC, ASIL D = ++)",
+        "ISO 26262-6:2018 \u00a79.4.5"
+      ],
+      "locator": "",
+      "evidence": {
+        "facts_used": [
+          "coverage.bms_master.mcdc.dead_pct",
+          "policy.limits.bms_master.mcdc"
+        ],
+        "values": {
+          "value": 90.2439024390244,
+          "limit": 5
+        }
+      }
+    },
+    {
+      "id": "F-004",
+      "rule_id": "COV-SLAVE-DEC",
+      "category": "dead_code",
+      "severity": "major",
+      "wip": false,
+      "finding": "bms_slave decision coverage gap = 45.00% (ASIL C, limit 1%)",
+      "reasoning": "Branch coverage is highly recommended for ASIL C. The bms_slave MIL stimulus does not exercise both directions of every decision.",
+      "recommend": [
+        "Identify the failing decisions in the Coverage Report and add driving stimulus, or justify with \u00a79.4.5."
+      ],
+      "refs": [
+        "ISO 26262-6:2018 Table 12 (branch coverage, ASIL C = ++)"
+      ],
+      "locator": "",
+      "evidence": {
+        "facts_used": [
+          "coverage.bms_slave.decision.dead_pct",
+          "policy.limits.bms_slave.dec"
+        ],
+        "values": {
+          "value": 45,
+          "limit": 1
+        }
+      }
+    },
+    {
+      "id": "F-005",
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "severity": "info",
+      "wip": true,
+      "finding": "Unconnected outport port on fault_predictor/Predict/window",
+      "reasoning": "`fault_predictor/Predict/window` (Inport) in fault_predictor has a dangling outport port. QM scope, but worth tidying before deployment.",
+      "recommend": [
+        "Wire the port or terminate it."
+      ],
+      "refs": [],
+      "locator": "hilite_system('fault_predictor/Predict/window')",
+      "evidence": {
+        "facts_used": [
+          "port.block_type",
+          "port.path",
+          "port.type"
+        ],
+        "values": {
+          "path": "fault_predictor/Predict/window",
+          "type": "outport",
+          "btype": "Inport"
+        }
+      }
+    },
+    {
+      "id": "F-006",
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "severity": "info",
+      "wip": true,
+      "finding": "Unconnected inport port on fault_predictor/Predict/Predict",
+      "reasoning": "`fault_predictor/Predict/Predict` (SubSystem) in fault_predictor has a dangling inport port. QM scope, but worth tidying before deployment.",
+      "recommend": [
+        "Wire the port or terminate it."
+      ],
+      "refs": [],
+      "locator": "hilite_system('fault_predictor/Predict/Predict')",
+      "evidence": {
+        "facts_used": [
+          "port.block_type",
+          "port.path",
+          "port.type"
+        ],
+        "values": {
+          "path": "fault_predictor/Predict/Predict",
+          "type": "inport",
+          "btype": "SubSystem"
+        }
+      }
+    },
+    {
+      "id": "F-007",
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "severity": "info",
+      "wip": true,
+      "finding": "Unconnected outport port on fault_predictor/Predict/Predict",
+      "reasoning": "`fault_predictor/Predict/Predict` (SubSystem) in fault_predictor has a dangling outport port. QM scope, but worth tidying before deployment.",
+      "recommend": [
+        "Wire the port or terminate it."
+      ],
+      "refs": [],
+      "locator": "hilite_system('fault_predictor/Predict/Predict')",
+      "evidence": {
+        "facts_used": [
+          "port.block_type",
+          "port.path",
+          "port.type"
+        ],
+        "values": {
+          "path": "fault_predictor/Predict/Predict",
+          "type": "outport",
+          "btype": "SubSystem"
+        }
+      }
+    },
+    {
+      "id": "F-008",
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "severity": "info",
+      "wip": true,
+      "finding": "Unconnected inport port on fault_predictor/Predict/probOutput",
+      "reasoning": "`fault_predictor/Predict/probOutput` (Outport) in fault_predictor has a dangling inport port. QM scope, but worth tidying before deployment.",
+      "recommend": [
+        "Wire the port or terminate it."
+      ],
+      "refs": [],
+      "locator": "hilite_system('fault_predictor/Predict/probOutput')",
+      "evidence": {
+        "facts_used": [
+          "port.block_type",
+          "port.path",
+          "port.type"
+        ],
+        "values": {
+          "path": "fault_predictor/Predict/probOutput",
+          "type": "inport",
+          "btype": "Outport"
+        }
+      }
+    }
+  ],
+  "trace": [
+    {
+      "pass": 1,
+      "rule_id": "COV-MASTER-COND",
+      "category": "dead_code",
+      "source": "dead_code.yaml",
+      "fired": true,
+      "bindings": {
+        "value": 23.50119904076739,
+        "limit": 0
+      },
+      "facts": [
+        "coverage.bms_master.condition.dead_pct",
+        "policy.limits.bms_master.cond"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "COV-MASTER-DEC",
+      "category": "dead_code",
+      "source": "dead_code.yaml",
+      "fired": true,
+      "bindings": {
+        "value": 51.52963671128107,
+        "limit": 0
+      },
+      "facts": [
+        "coverage.bms_master.decision.dead_pct",
+        "policy.limits.bms_master.dec"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "COV-MASTER-MCDC",
+      "category": "dead_code",
+      "source": "dead_code.yaml",
+      "fired": true,
+      "bindings": {
+        "value": 90.2439024390244,
+        "limit": 5
+      },
+      "facts": [
+        "coverage.bms_master.mcdc.dead_pct",
+        "policy.limits.bms_master.mcdc"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "COV-SLAVE-DEC",
+      "category": "dead_code",
+      "source": "dead_code.yaml",
+      "fired": true,
+      "bindings": {
+        "value": 45,
+        "limit": 1
+      },
+      "facts": [
+        "coverage.bms_slave.decision.dead_pct",
+        "policy.limits.bms_slave.dec"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "fault_predictor/Predict/window",
+        "type": "outport",
+        "btype": "Inport"
+      },
+      "facts": [
+        "port.block_type",
+        "port.path",
+        "port.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "fault_predictor/Predict/Predict",
+        "type": "inport",
+        "btype": "SubSystem"
+      },
+      "facts": [
+        "port.block_type",
+        "port.path",
+        "port.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "fault_predictor/Predict/Predict",
+        "type": "outport",
+        "btype": "SubSystem"
+      },
+      "facts": [
+        "port.block_type",
+        "port.path",
+        "port.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-UNCONNECTED-PREDICTOR",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "fault_predictor/Predict/probOutput",
+        "type": "inport",
+        "btype": "Outport"
+      },
+      "facts": [
+        "port.block_type",
+        "port.path",
+        "port.type"
+      ]
+    }
+  ]
+}

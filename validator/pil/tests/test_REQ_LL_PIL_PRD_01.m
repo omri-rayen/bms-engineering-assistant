@@ -55,31 +55,22 @@ r.metrics.max_abs_err = max_err;
 r.metrics.mean_abs_err = mean(err, 'all');
 r.metrics.run_s = RUN_S;
 
-% Overlay MIL vs PIL prob_3 (3 fault classes).
-try
-    here    = fileparts(mfilename('fullpath'));
-    valRoot = fileparts(fileparts(here));
-    plotDir = fullfile(valRoot, 'reports', 'plots', 'pil');
-    if ~isfolder(plotDir), mkdir(plotDir); end
-    s_mil = val.signal(out_mil, 'prob_3');
-    s_pil = val.signal(out_pil, 'prob_3');
-    L = min(numel(s_mil.t), numel(s_pil.t));
-    fig = figure('Visible','off','Position',[100 100 1100 700]);
-    nC  = size(prob_mil, 2);
-    for c = 1:nC
-        subplot(nC, 1, c);
-        plot(s_mil.t(1:L), s_mil.y(1:L, c), 'k-',  'LineWidth', 1.0); hold on;
-        plot(s_pil.t(1:L), s_pil.y(1:L, c), 'r--', 'LineWidth', 1.0);
-        ylabel(sprintf('prob_{class %d}', c)); grid on;
-        if c == 1
-            title(sprintf('PIL vs MIL  -  prob\\_3  -  max|err|=%.2e (tol %.1e)', max_err, ABS_TOL));
-        end
-        if c == nC, xlabel('time [s]'); end
-        legend({'MIL','PIL'}, 'Location','best');
-    end
-    exportgraphics(fig, fullfile(plotDir, 'pil_vs_mil_prob3.png'), 'Resolution', 120);
-    close(fig);
-catch ME
-    warning('pil:prd:plot', 'overlay plot failed: %s', ME.message);
+% MIL vs PIL: prob_3 (one row per class).
+s_mil = val.signal(out_mil, 'prob_3');
+s_pil = val.signal(out_pil, 'prob_3');
+L = min(numel(s_mil.t), numel(s_pil.t));
+nC = size(prob_mil, 2);
+sigs = repmat(struct('name','','t',[],'y_ref',[],'y_tgt',[]), nC, 1);
+labels = {'OT (class 1)','OV (class 2)','UV (class 3)'};
+for c = 1:nC
+    sigs(c).name  = labels{min(c,numel(labels))};
+    sigs(c).t     = s_mil.t(1:L);
+    sigs(c).y_ref = s_mil.y(1:L, c);
+    sigs(c).y_tgt = s_pil.y(1:L, c);
 end
+r.signals_plot = string(val.equivalence_plot(r, struct( ...
+    'plot_dir', val.plot_root('pil'), 'filename', 'PIL-PRD-01.png', ...
+    'ref_label','MIL host', 'tgt_label','PIL STM32', ...
+    'tol_abs', ABS_TOL, ...
+    'signals', sigs)));
 end

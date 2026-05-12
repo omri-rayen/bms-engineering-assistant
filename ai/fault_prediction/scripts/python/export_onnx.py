@@ -1,18 +1,7 @@
-"""Export the trained fault-predictor as ONNX for MATLAB / Simulink.
+"""Export best.pt as ONNX with z-score normalisation baked in.
 
-Wraps the PyTorch network so the deployed graph contains:
-  z-score normalisation (mu, sig baked in)  ->  LSTM  ->  FC + ReLU  ->  FC  ->  sigmoid
-
-That way the Simulink Predict block consumes raw [W, F] windows and
-emits per-class probabilities directly. Thresholding is done downstream
-in Simulink against thresholds.json.
-
-Reads:
-  models/best.pt
-  data/preprocessed/stats.json
-
-Writes:
-  ../../../model/fault_predictor/inference/fault_predictor.onnx
+Reads  : models/best.pt, data/preprocessed/stats.json
+Writes : model/fault_predictor/inference/fault_predictor.onnx
 """
 
 from __future__ import annotations
@@ -65,9 +54,7 @@ def main() -> None:
 
     model = DeployModel(base, mu, sig).eval()
 
-    # Fixed-shape export: batch=1, time=W, features=F. Matches what the
-    # Simulink Predict block will feed in (one sliding window per step).
-    dummy = torch.zeros(1, W, F, dtype=torch.float32)
+    dummy = torch.zeros(1, W, F, dtype=torch.float32)  # fixed shape: [1, W, F]
     out_path = INF_DIR / "fault_predictor.onnx"
 
     torch.onnx.export(

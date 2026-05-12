@@ -18,13 +18,21 @@ comPort   = pil.detect_stlink_port();              % e.g. 'COM3'
 % Register STM32CubeMX + STM32CubeProgrammer with MATLAB if installed at
 % the standard Windows location but not yet linked. The CubeMX project
 % (.ioc) is consumed by the STM32 target during code-gen and the
-% programmer CLI is invoked to flash the resulting .elf.
-cubeMxDir = 'C:\Program Files\STMicroelectronics\STM32Cube\STM32CubeMX';
+% programmer CLI is invoked to flash the resulting .elf. Override the
+% default install location with the BMS_STM32CUBEMX / BMS_STM32CUBEPROG
+% environment variables if Cube is installed elsewhere.
+cubeMxDir = getenv('BMS_STM32CUBEMX');
+if isempty(cubeMxDir)
+    cubeMxDir = 'C:\Program Files\STMicroelectronics\STM32Cube\STM32CubeMX';
+end
 if exist(fullfile(cubeMxDir, 'STM32CubeMX.exe'), 'file') == 2
     setpref('MW_STM32', 'STM32CubeMX', ...
         struct('Location', cubeMxDir, 'Version', '6.4.0'));
 end
-cubeProgDir = 'C:\Program Files\STMicroelectronics\STM32Cube\STM32CubeProgrammer';
+cubeProgDir = getenv('BMS_STM32CUBEPROG');
+if isempty(cubeProgDir)
+    cubeProgDir = 'C:\Program Files\STMicroelectronics\STM32Cube\STM32CubeProgrammer';
+end
 if exist(fullfile(cubeProgDir, 'bin', 'STM32_Programmer_CLI.exe'), 'file') == 2
     setpref('MW_STM32', 'STM32CubeProgrammer', ...
         struct('Location', fullfile(cubeProgDir, 'bin'), 'Version', '2.6.0'));
@@ -33,8 +41,12 @@ end
 board = 'STM32H7xx Based (Single-core)';
 
 load_system(mdl);
+% Avoid the Variants warning that find_mdlrefs emits when it walks past
+% Variant Subsystem boundaries with no explicit match filter.
+set_param(mdl, 'Dirty', 'off');
 
-refs = find_mdlrefs(mdl, 'AllLevels', true);
+refs = find_mdlrefs(mdl, 'AllLevels', true, ...
+    'MatchFilter', @Simulink.match.allVariants);
 refs = [refs(:); {mdl}];
 
 for i = 1:numel(refs)
@@ -55,6 +67,14 @@ for i = 1:numel(refs)
     % Compile the embedded code with -O3 (Faster Runs); the BMS step is
     % LSTM-heavy and at -O0 it overruns the 100 ms BMS tick by ~96 ms.
     set_param(m, 'BuildConfiguration', 'Faster Runs');
+
+    % Coverage instrumentation is incompatible with on-chip execution-
+    % time profiling (Embedded Coder refuses to build PIL with both on).
+    % Force every cov knob off; if a previous MIL run dirtied the in-
+    % memory model these will still be 'on'.
+    set_param(m, 'CovEnable',         'off');
+    set_param(m, 'RecordCoverage',    'off');
+    set_param(m, 'CovModelRefEnable', 'off');
 
     % Point the STM32 target at the bundled Nucleo H7A3 CubeMX project
     % and the ST-Link virtual COM port for the PIL serial transport.
@@ -92,6 +112,24 @@ for i = 1:numel(refs)
         set_param(m, 'CodeExecutionProfiling',       'on');
         set_param(m, 'CodeProfilingInstrumentation', 'Coarse');
         set_param(m, 'CodeProfilingSaveOptions',     'AllData');
+    end
+end
+
+% Clear the dirty flag on every touched model. PIL configuration is meant
+% to be transient (we deliberately do not persist these settings to .slx),
+% but Simulink still flags the model as modified, which trips a downstream
+% "unsaved changes" warning on the next find_mdlrefs walk.
+for i = 1:numel(refs)
+    try, set_param(refs{i}, 'Dirty', 'off'); catch, end %#ok<CTCH>
+end
+
+% Final assertion: with CodeExecutionProfiling=on on the top model, no
+% model in the PIL graph may have any coverage flag still on, otherwise
+% slbuild errors out late with a confusing message.
+for i = 1:numel(refs)
+    if strcmp(get_param(refs{i}, 'CovEnable'), 'on')
+        error('pil:configure:covStillOn', ...
+            'CovEnable is still ''on'' for model ''%s'' after configure.', refs{i});
     end
 end
 end

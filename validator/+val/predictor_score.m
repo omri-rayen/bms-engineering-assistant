@@ -1,14 +1,8 @@
 function [score, byclass] = predictor_score(varargin)
-% Run all (class scenario) x (test trip) MIL sims and return aggregated
-% sample-level TP/FP/FN counts and per-event lead times per class. Mirrors
-% ai/fault_prediction/scripts/python/evaluate.py.
-%
-%   score    1x3 struct array (one per class OT/OV/UV) with fields
-%              tp, fp, fn, recall, leads (vector of per-event lead [s]),
-%              n_events, median_lead_s
-%   byclass  struct with the same content keyed by name (.OT/.OV/.UV)
-%
-% Result is cached for the MATLAB session; pass 'force', true to recompute.
+% MIL predictor validation: TP/FP/FN + per-event lead times per class.
+% score    1x3 struct (OT/OV/UV): tp, fp, fn, recall, leads, n_events, median_lead_s
+% byclass  same content keyed by name (.OT/.OV/.UV)
+% Result cached per session; pass 'force', true to recompute.
 p = inputParser;
 p.addParameter('force', false);
 p.parse(varargin{:});
@@ -80,7 +74,7 @@ for s = 1:numel(fault_scens)
             score(cls).fp = score(cls).fp + nnz(a & ~y);
             score(cls).fn = score(cls).fn + nnz(~a & y);
 
-            score(cls).leads = [score(cls).leads; local_event_leads(y, a, LOOKBACK, DT)];
+            score(cls).leads = [score(cls).leads; local_event_leads(y, a, LOOKBACK, DT, H(cls))];
         catch ME
             warning('predictor_score:simFail', '%s/%s: %s', scen.id, tid, ME.message);
         end
@@ -109,9 +103,9 @@ y  = (cs(1+H : N+H) - cs(1:N)) > 0;
 end
 
 
-function leads = local_event_leads(y, a, LOOKBACK, DT)
-% Per-event lead time: for each contiguous y-run, find first alarm sample
-% in [start-LOOKBACK, end-1]; lead = (start - first_alarm_idx) * DT.
+function leads = local_event_leads(y, a, LOOKBACK, DT, H)
+% Lead time vs BMS warn crossing.
+% Lead = (y_start - first_alarm) * DT + H*DT  (positive = alarm before warn).
 leads = [];
 padded = [false; y(:); false];
 edges  = diff(int8(padded));
@@ -122,7 +116,7 @@ for k = 1:numel(starts)
     lo = max(1, s - LOOKBACK);
     hits = find(a(lo : e-1), 1, 'first');
     if ~isempty(hits)
-        leads(end+1, 1) = (s - (lo + hits - 1)) * DT; %#ok<AGROW>
+        leads(end+1, 1) = (s - (lo + hits - 1)) * DT + H * DT; %#ok<AGROW>
     end
 end
 end

@@ -3,6 +3,36 @@
 Model-based design + AI fault prediction for an EV battery management system,
 validated end-to-end via MIL → SIL → PIL on an STM32 Nucleo-H7A3ZI-Q.
 
+## V-model
+
+The project runs two parallel V-models against the same requirement
+catalogue:
+
+```mermaid
+flowchart LR
+    subgraph MODEL["Model-level V"]
+      direction TB
+      RM[REQ-HL / REQ-LL]:::req --> MDL[modelling<br/>model/]
+      MDL --> MIL[MIL<br/>validator/mil]
+      MIL --> SIL[SIL<br/>validator/sil]
+      SIL --> PIL[PIL on STM32<br/>validator/pil]
+      PIL --> ACC1[closed-loop<br/>acceptance]
+      RM -.verifies.-> ACC1
+    end
+    subgraph SW["Software-level V"]
+      direction TB
+      RS[REQ-SW-*]:::req --> CODE[code<br/>orchestrator/, doc_generator/, analyzer/, orch/, +val/]
+      CODE --> UT[unit<br/>tests/python, tests/matlab]
+      UT --> IT[integration<br/>tests/integration]
+      IT --> ACC2[UI acceptance<br/>app/bms_assistant.m manual]
+      RS -.verifies.-> ACC2
+    end
+    classDef req fill:#fff3b0,stroke:#b08400,color:#3a2700;
+```
+
+Per-requirement test mapping and verdict-figure conventions are in
+[docs/v_model_audit.md](docs/v_model_audit.md).
+
 ## Project layout
 
 ```
@@ -32,7 +62,30 @@ bms-engineering-assistant/
 └── Bmsengineeringassistant.prj  # MATLAB project file
 ```
 
-## Running validation
+## Engineering Assistant UI
+
+Launch the App-Designer-style UI from MATLAB after `startup`:
+
+```matlab
+bms_assistant
+```
+
+Three tabs:
+* **Model**    — open `bms_master` / `bms_slave` / `fault_predictor` in
+  Simulink for editing. *Reset to snapshot* restores the original `.slx`
+  files from `model/.snapshots/*.slx.bak` (created on first edit).
+* **Validate** — pick MIL/SIL/PIL/COV paths and a per-path scenario
+  (subsystem group for MIL, flat for SIL/PIL), watch the live console
+  + progress bar, then save the generated `FULL_REPORT.json` /
+  `REPORT.html` from `doc_generator/reports/`.
+* **Reports**  — browse past runs (timestamped), preview HTML in a
+  browser, save HTML/JSON anywhere.
+
+The UI calls the in-process MATLAB orchestrator `orch.run(...)` (see
+`orch/+orch/`). For headless/CI use, the equivalent Python entry point
+`python -m orchestrator` remains available.
+
+## Running validation (CLI)
 
 Open the project (or `startup` from MATLAB) and call:
 
@@ -60,20 +113,22 @@ result struct with the matching `REQ-LL-*` ID from
 | Suite     | Tests | Coverage                                       |
 | --------- | ----- | ---------------------------------------------- |
 | plant     | 3     | V_pack / SoC_pack / T_pack RMSE vs measurement |
-| bms       | 15    | VMON, TMON, IMON, FSM, SOC, SOH, BAL, THM, PWR, WDG, HWP |
+| bms       | 24    | VMON, TMON, IMON, FSM, SOC, SOH, BAL, THM, PWR, WDG, AGG, PRD, HWP |
 | predictor | 5     | OT/OV/UV lead-time, per-class DR, FAR          |
 | sil       | 1     | bms_master MIL/SIL signal equivalence          |
-| pil       | 2     | bms_master WCET, LSTM prob_3 PIL/MIL match     |
+| pil       | 3     | bms_master WCET, RAM footprint, LSTM prob_3 PIL/MIL match |
 
 ## Hardware
 
 - MCU: STM32 Nucleo-H7A3ZI-Q (Cortex-M7 @ 280 MHz)
-- PIL transport: Serial via ST-Link VCP (port auto-detected)
-- WCET measurement: wall-clock elapsed / n_steps over a 300-step PIL run.
-  This is a conservative upper bound (includes serial round-trip overhead);
-  see REQ-LL-RT-WCET-01 in [validator/requirements/requirements.json](validator/requirements/requirements.json)
-  for the rationale (TIM5/Embedded-Coder profiling is not used on this
-  target — it caused the PIL serial handshake to hang).
+- PIL transport: Serial via ST-Link VCP (`COM3` on the dev PC, override
+  in `validator/pil/+pil/configure.m` if different)
+- WCET measurement: Embedded Coder code-execution profiling sampled by the
+  free-running 32-bit TIM5 counter (1 tick = 3.57 ns). HAL TimeBase runs
+  on TIM7 to avoid a clash, NVIC priorities (USART3=0, DMA=0, TIM7=15)
+  keep the PIL serial responsive. After skipping a warmup window the max
+  warm-step time over ≥ `req.RT_WCET_min_steps` is gated against
+  `req.RT_WCET_max_us`. See `validator/pil/tests/test_REQ_LL_RT_WCET_01.m`.
 
 ## Parameters
 

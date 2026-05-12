@@ -63,31 +63,22 @@ r.metrics.trip_id     = string(TRIP_ID);
 r.metrics.rel_tol     = REL_TOL;
 r.metrics.abs_tol     = ABS_TOL;
 
-% Overlay MIL vs SIL for SoC_pack and fault_severity.
-try
-    here    = fileparts(mfilename('fullpath'));
-    valRoot = fileparts(fileparts(here));
-    plotDir = fullfile(valRoot, 'reports', 'plots', 'sil');
-    if ~isfolder(plotDir), mkdir(plotDir); end
-    PLOT_SIGS = {'SoC_pack','fault_severity'};
-    fig = figure('Visible','off','Position',[100 100 1100 600]);
-    for ii = 1:numel(PLOT_SIGS)
-        nm = PLOT_SIGS{ii};
-        sa = val.signal(out_mil, nm); sb = val.signal(out_sil, nm);
-        subplot(numel(PLOT_SIGS), 1, ii);
-        plot(sa.t, sa.y, 'k-',  'LineWidth', 1.0); hold on;
-        plot(sb.t, sb.y, 'r--', 'LineWidth', 1.0);
-        ylabel(nm, 'Interpreter','none'); grid on;
-        if ii == 1
-            title(sprintf('SIL vs MIL  -  %s  -  max|err|: SoC=%.2e, fault=%.2e', ...
-                TRIP_ID, worst.SoC_pack, worst.fault_severity), 'Interpreter','none');
-        end
-        if ii == numel(PLOT_SIGS), xlabel('time [s]'); end
-        legend({'MIL','SIL'}, 'Location','best');
-    end
-    exportgraphics(fig, fullfile(plotDir, 'sil_vs_mil.png'), 'Resolution', 120);
-    close(fig);
-catch ME
-    warning('sil:eq:plot', 'overlay plot failed: %s', ME.message);
+% MIL vs SIL overlay + per-step |err| against tolerance.
+PLOT_SIGS = {'SoC_pack','fault_severity','P_limit_dchg'};
+sigs = repmat(struct('name','','t',[],'y_ref',[],'y_tgt',[]), numel(PLOT_SIGS), 1);
+for ii = 1:numel(PLOT_SIGS)
+    nm = PLOT_SIGS{ii};
+    sa = val.signal(out_mil, nm);
+    sb = val.signal(out_sil, nm);
+    L = min(numel(sa.t), numel(sb.t));
+    sigs(ii).name  = nm;
+    sigs(ii).t     = sa.t(1:L);
+    sigs(ii).y_ref = sa.y(1:L,:);
+    sigs(ii).y_tgt = sb.y(1:L,:);
 end
+r.signals_plot = string(val.equivalence_plot(r, struct( ...
+    'plot_dir', val.plot_root('sil'), 'filename', 'SIL-EQ-01.png', ...
+    'ref_label','MIL', 'tgt_label','SIL', ...
+    'tol_abs', ABS_TOL, 'tol_rel', REL_TOL, ...
+    'signals', sigs)));
 end

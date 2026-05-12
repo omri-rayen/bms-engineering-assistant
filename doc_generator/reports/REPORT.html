@@ -1,0 +1,112 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>BMS Verification & Validation Report</title>
+<style>
+body{font-family:Georgia,"Times New Roman",serif;color:#000;background:#fff;max-width:820px;margin:0 auto;line-height:1.5;padding:20px}
+h1{font-size:2em;margin:0 0 .5em}
+h2{font-size:1.5em;margin:1em 0 .5em}
+h3{font-size:1.2em;margin:.8em 0 .3em}
+table{border-collapse:collapse;width:100%;margin:.5em 0}
+th,td{border:1px solid #999;padding:4px 6px;text-align:left}
+th{font-weight:bold}
+code{font-family:monospace;background:#f4f4f4;padding:2px 4px}
+details{margin-top:.5em}
+</style>
+</head>
+<body>
+
+<section id="header">
+<h1>BMS Verification & Validation Report</h1>
+<p>Generated: 2026-05-10</p>
+</section>
+
+<section id="summary">
+<h2>Summary</h2>
+<p>The verification covered MIL, SIL and PIL test suites for the 96s1p Samsung‑SDI BMS with an embedded LSTM fault predictor. All executed tests passed and the overall V&V verdict is <strong>blocking</strong> due to model‑analysis findings.</p>
+<p>Raw data lives in <code>FULL_REPORT.json</code>; pointers such as <code>/validation/mil/results/3</code> address individual rows.</p>
+<table>
+<tr><th>Label</th><th>Value</th></tr>
+<tr><td>Tests total</td><td>33</td></tr>
+<tr><td>MIL pass‑rate</td><td>100.0 %</td></tr>
+<tr><td>SIL pass‑rate</td><td>100.0 %</td></tr>
+<tr><td>PIL pass‑rate</td><td>100.0 %</td></tr>
+<tr><td>Findings (critical)</td><td>1</td></tr>
+<tr><td>Findings (major)</td><td>2</td></tr>
+<tr><td>Findings (minor)</td><td>8</td></tr>
+<tr><td>Findings (info)</td><td>8</td></tr>
+<tr><td>Verdict</td><td>blocking</td></tr>
+</table>
+</section>
+
+<section id="scope">
+<h2>Scope</h2>
+<ul>
+<li>MIL – Model‑in‑the‑Loop verification, ISO 26262‑6:2018 clause <code>/validation/mil</code></li>
+<li>SIL – Software‑in‑the‑Loop verification, ISO 26262‑6:2018 clause <code>/validation/sil</code></li>
+<li>PIL – Processor‑in‑the‑Loop verification, ISO 26262‑6:2018 clause <code>/validation/pil</code></li>
+<li>Static analysis – Model‑analysis rules, ISO 26262‑6:2018 clause <code>/analysis</code></li>
+</ul>
+</section>
+
+<section id="mil">
+<h2>MIL Results</h2>
+<p>All MIL tests passed.</p>
+<table>
+<tr><th>Req ID</th><th>Name</th><th>Status</th><th>Reference</th></tr>
+<tr><td>REQ-LL-BMS-AGG-01</td><td>Aggregator min/max sweep across cells &amp; temps</td><td>pass</td><td><code>/validation/mil/results/0</code></td></tr>
+<tr><td>REQ-LL-BMS-AGG-02</td><td>Slave aggregator + balancer cell sweep</td><td>pass</td><td><code>/validation/mil/results/1</code></td></tr>
+<tr><td>REQ-LL-BMS-BAL-01</td><td>Slave balancing on/off + target</td><td>pass</td><td><code>/validation/mil/results/2</code></td></tr>
+<tr><td>REQ-LL-BMS-BAL-02</td><td>Cell spread within OEM envelope on longest trip</td><td>pass</td><td><code>/validation/mil/results/3</code></td></tr>
+<tr><td>REQ-LL-BMS-BAL-03</td><td>Master arbitrator module sweep</td><td>pass</td><td><code>/validation/mil/results/4</code></td></tr>
+<tr><td>REQ-LL-BMS-FSM-01</td><td>Severity FSM escalation + recovery + latch</td><td>pass</td><td><code>/validation/mil/results/5</code></td></tr>
+<tr><td>REQ-LL-BMS-FSM-02</td><td>Per‑slave fault propagation 1..8</td><td>pass</td><td><code>/validation/mil/results/6</code></td></tr>
+<tr><td>REQ-LL-BMS-HWP-01</td><td>HW protection no‑debounce shutdown</td><td>pass</td><td><code>/validation/mil/results/7</code></td></tr>
+<tr><td>REQ-LL-BMS-IMON-01</td><td>OC charge debounce ladder</td><td>pass</td><td><code>/validation/mil/results/8</code></td></tr>
+<tr><td>REQ-LL-BMS-IMON-02</td><td>OC discharge debounce ladder</td><td>pass</td><td><code>/validation/mil/results/9</code></td></tr>
+<tr><td>REQ-LL-BMS-PRD-01</td><td>Per‑class fault ladder via fault_flags_8 + predictor</td><td>pass</td><td><code>/validation/mil/results/10</code></td></tr>
+<tr><td>REQ-LL-BMS-PWR-01</td><td>Power limiter derate + shutdown</td><td>pass</td><td><code>/validation/mil/results/11</code></td></tr>
+<tr><td>REQ-LL-BMS-PWR-02</td><td>Power limiter k_soc vs k_temp branches</td><td>pass</td><td><code>/validation/mil/results/12</code></td></tr>
+<tr><td>REQ-LL-BMS-SOC-01</td><td>EKF SoC convergence on constant 30 A</td><td>pass</td><td><code>/validation/mil/results/13</code></td></tr>
+<tr><td>REQ-LL-BMS-SOH-01</td><td>SoH bounded and monotonic</td><td>pass</td><td><code>/validation/mil/results/14</code></td></tr>
+<tr><td>REQ-LL-BMS-SOH-02</td><td>SoH dSoC&gt;10% update branch</td><td>pass</td><td><code>/validation/mil/results/15</code></td></tr>
+<tr><td>REQ-LL-BMS-THM-01</td><td>Thermal manager heater + chiller</td><td>pass</td><td><code>/validation/mil/results/16</code></td></tr>
+<tr><td>REQ-LL-BMS-THM-02</td><td>Thermal manager saturation + hysteresis</td><td>pass</td><td><code>/validation/mil/results/17</code></td></tr>
+<tr><td>REQ-LL-BMS-TMON-01</td><td>OT monitor debounce ladder</td><td>pass</td><td><code>/validation/mil/results/18</code></td></tr>
+<tr><td>REQ-LL-BMS-TMON-02</td><td>UT monitor debounce ladder</td><td>pass</td><td><code>/validation/mil/results/19</code></td></tr>
+<tr><td>REQ-LL-BMS-VMON-01</td><td>OV monitor debounce ladder</td><td>pass</td><td><code>/validation/mil/results/20</code></td></tr>
+<tr><td>REQ-LL-BMS-VMON-02</td><td>UV monitor debounce ladder</td><td>pass</td><td><code>/validation/mil/results/21</code></td></tr>
+<tr><td>REQ-LL-BMS-WDG-01</td><td>Slave watchdog detects frozen flag</td><td>pass</td><td><code>/validation/mil/results/22</code></td></tr>
+<tr><td>REQ-LL-BMS-WDG-02</td><td>Watchdog severity vs disconnected count</td><td>pass</td><td><code>/validation/mil/results/23</code></td></tr>
+<tr><td>REQ-LL-PRD-DR-01</td><td>Per‑class predictor detection rate</td><td>pass</td><td><code>/validation/mil/results/24</code></td></tr>
+<tr><td>REQ-LL-PRD-FAR-01</td><td>Predictor false‑alarm rate on nominal trips</td><td>pass</td><td><code>/validation/mil/results/25</code></td></tr>
+<tr><td>REQ-LL-PRD-LT-01</td><td>OT median alarm lead‑time vs warn</td><td>pass</td><td><code>/validation/mil/results/26</code></td></tr>
+<tr><td>REQ-LL-PRD-LT-02</td><td>OV median alarm lead‑time vs warn</td><td>pass</td><td><code>/validation/mil/results/27</code></td></tr>
+<tr><td>REQ-LL-PRD-LT-03</td><td>UV median alarm lead‑time vs warn</td><td>pass</td><td><code>/validation/mil/results/28</code></td></tr>
+</table>
+</section>
+
+<section id="sil">
+<h2>SIL Results</h2>
+<p>All SIL checks passed.</p>
+<table>
+<tr><th>Check</th><th>Status</th><th>Value</th><th>Threshold</th><th>Reference</th></tr>
+<tr><td>eq_fault_severity</td><td>pass</td><td>0</td><td>&lt;=1.0e-02 rel + 1.0e-04 abs</td><td><code>/validation/sil/results/checks/0</code></td></tr>
+<tr><td>eq_SoC_pack</td><td>pass</td><td>2.6878721470779965e-11</td><td>&lt;=1.0e-02 rel + 1.0e-04 abs</td><td><code>/validation/sil/results/checks/1</code></td></tr>
+<tr><td>eq_SoH_pack</td><td>pass</td><td>0</td><td>&lt;=1.0e-02 rel + 1.0e-04 abs</td><td><code>/validation/sil/results/checks/2</code></td></tr>
+<tr><td>eq_P_limit_chg</td><td>pass</td><td>0</td><td>&lt;=1.0e-02 rel + 1.0e-04 abs</td><td><code>/validation/sil/results/checks/3</code></td></tr>
+<tr><td>eq_P_limit_dchg</td><td>pass</td><td>0</td><td>&lt;=1.0e-02 rel + 1.0e-04 abs</td><td><code>/validation/sil/results/checks/4</code></td></tr>
+<tr><td>eq_enable_bal_8</td><td>pass</td><td>0</td><td>&lt;=1.0e-02 rel + 1.0e-04 abs</td><td><code>/validation/sil/results/checks/5</code></td></tr>
+<tr><td>eq_prob_3</td><td>pass</td><td>8.64267349243164e-06</td><td>&lt;=1.0e-02 rel + 1.0e-04 abs</td><td><code>/validation/sil/results/checks/6</code></td></tr>
+<tr><td>eq_alarm_3</td><td>pass</td><td>0</td><td>&lt;=1.0e-02 rel + 1.0e-04 abs</td><td><code>/validation/sil/results/checks/7</code></td></tr>
+</table>
+<p>No numeric drift observed between SIL and MIL results.</p>
+</section>
+
+<section id="pil">
+<h2>PIL Results</h2>
+<p>All PIL checks passed.</p>
+<table>
+<tr><th>Check</th><th>Status</th><th>Value</th><th>Threshold</th><th>Reference</th></tr>
+<tr><td>prob3_pil_matches_mil</td><td>pass</td><td>1.1920928955078125e-07</td><td>0.001</td><

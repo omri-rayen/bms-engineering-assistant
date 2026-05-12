@@ -1,0 +1,153 @@
+{
+  "schema_version": "1.0",
+  "timestamp": "20260509_012239",
+  "inputs": {
+    "facts": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\analyzer\\reports\\FACTS.json",
+    "coverage": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\COV.json",
+    "mil": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\MIL.json",
+    "sil": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\SIL.json",
+    "pil": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\PIL.json",
+    "requirements": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\requirements\\requirements.json"
+  },
+  "summary": {
+    "n_findings": 3,
+    "by_severity": {
+      "info": 0,
+      "minor": 1,
+      "major": 1,
+      "critical": 1
+    },
+    "by_category": {
+      "dead_code": 3
+    },
+    "verdict": "blocking"
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "rule_id": "DC-MASTER-COND",
+      "category": "dead_code",
+      "severity": "major",
+      "finding": "bms_master condition dead = 1.08% (limit 0.0%)",
+      "reasoning": "Some Boolean operand has never toggled both ways. This usually points at one input of an AND/OR gate that is constant under the current stimulus -- often easy to fix with a targeted test.",
+      "recommend": [
+        "Locate the gates flagged by Coverage and toggle each input independently in a small dedicated MIL test."
+      ],
+      "refs": [],
+      "evidence": {
+        "facts_used": [
+          "coverage.bms_master.condition.dead_pct",
+          "policy.limits.bms_master.cond"
+        ],
+        "values": {
+          "model": "bms_master",
+          "value": 1.0791366906474877,
+          "limit": 0
+        }
+      }
+    },
+    {
+      "id": "F-002",
+      "rule_id": "DC-MASTER-DEC",
+      "category": "dead_code",
+      "severity": "critical",
+      "finding": "bms_master decision dead = 2.77% (ASIL D, limit 0.0%)",
+      "reasoning": "A branch never taken in an ASIL-D model means a logical path of the design has never been verified. Decision coverage is required at ASIL D and >= ASIL B by ISO 26262-6 table 7.",
+      "recommend": [
+        "Identify the un-toggled decisions in COV.json and add tests that drive both the true and the false branch.",
+        "If a branch is genuinely unreachable (defensive coding), add a coverage filter with a written justification."
+      ],
+      "refs": [
+        "ISO 26262-6:2018, table 7 (branch coverage at ASIL D)"
+      ],
+      "evidence": {
+        "facts_used": [
+          "coverage.bms_master.decision.dead_pct",
+          "policy.component_asil.bms_master",
+          "policy.limits.bms_master.dec"
+        ],
+        "values": {
+          "model": "bms_master",
+          "asil": "D",
+          "value": 2.772466539196941,
+          "limit": 0
+        }
+      }
+    },
+    {
+      "id": "F-003",
+      "rule_id": "DC-MASTER-MCDC",
+      "category": "dead_code",
+      "severity": "minor",
+      "finding": "bms_master MCDC dead = 90.24% (limit 0.0%)",
+      "reasoning": "MCDC requires every input of a multi-condition decision to flip the outcome on its own. On wide AND-gates (e.g. Balancing_Arbitrator's 4-input AND across 8 lanes) this is structurally hard. ISO 26262-6 \u00a79.4.5 explicitly allows accepting the gap with rationale.",
+      "recommend": [
+        "Either add MCDC-specific stimuli for each multi-input gate, or document the residual gap with a \u00a79.4.5 rationale and freeze it."
+      ],
+      "refs": [],
+      "evidence": {
+        "facts_used": [
+          "coverage.bms_master.mcdc.dead_pct",
+          "policy.limits.bms_master.mcdc"
+        ],
+        "values": {
+          "model": "bms_master",
+          "value": 90.2439024390244,
+          "limit": 0
+        }
+      }
+    }
+  ],
+  "trace": [
+    {
+      "pass": 1,
+      "rule_id": "DC-MASTER-COND",
+      "category": "dead_code",
+      "source": "dead_code.yaml",
+      "fired": true,
+      "bindings": {
+        "model": "bms_master",
+        "value": 1.0791366906474877,
+        "limit": 0
+      },
+      "facts": [
+        "coverage.bms_master.condition.dead_pct",
+        "policy.limits.bms_master.cond"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "DC-MASTER-DEC",
+      "category": "dead_code",
+      "source": "dead_code.yaml",
+      "fired": true,
+      "bindings": {
+        "model": "bms_master",
+        "asil": "D",
+        "value": 2.772466539196941,
+        "limit": 0
+      },
+      "facts": [
+        "coverage.bms_master.decision.dead_pct",
+        "policy.component_asil.bms_master",
+        "policy.limits.bms_master.dec"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "DC-MASTER-MCDC",
+      "category": "dead_code",
+      "source": "dead_code.yaml",
+      "fired": true,
+      "bindings": {
+        "model": "bms_master",
+        "value": 90.2439024390244,
+        "limit": 0
+      },
+      "facts": [
+        "coverage.bms_master.mcdc.dead_pct",
+        "policy.limits.bms_master.mcdc"
+      ]
+    }
+  ]
+}

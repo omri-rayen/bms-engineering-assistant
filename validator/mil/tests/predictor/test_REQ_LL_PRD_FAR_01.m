@@ -54,4 +54,9 @@ r.metrics.FAR        = far;
 r.metrics.alarm_n    = total_alarms;
 r.metrics.sample_n   = total_samples;
 r.metrics.trip_count = trip_count;
+try
+    score = val.predictor_score();
+    r.signals_plot = string(val.predictor_summary_plot('PRD-FAR-01', score, r));
+catch
+end
 end

@@ -1,0 +1,461 @@
+# model_arch.yaml -- structural / hygiene rules over the Simulink model.
+#
+# Each forEach rule fires once per offending element with the real
+# Simulink path inlined into headline / reasoning / fix. The engine
+# auto-attaches `hilite_system('<path>')` to every finding that binds
+# `path`, and downranks any path that lives under one of
+# policy.wip_paths to severity=info with a [WIP] tag.
+#
+# Standards hygiene: refs cite ISO 26262-6:2018 (the software part)
+# only when the clause genuinely covers the topic, and the MathWorks
+# Advisory Board (MAB / MAAB) by rule id only when that id is the
+# canonical source. We do NOT cite ISO 26262-8 (tool qualification)
+# for modelling-style topics.
+
+rules:
+
+  # ============= signal hygiene ======================================
+  - id: ARCH-UNCONNECTED-MASTER
+    category: model_arch
+    forEach:
+      var: port
+      in:  model.bms_master.static.unconnected_ports_list
+    when: port.path != ""
+    bind:
+      path:   port.path
+      type:   port.type
+      n:      port.port
+      parent: port.parent
+      btype:  port.block_type
+    severity: major
+    finding: "Unconnected {type} port #{n} on {path}"
+    reasoning: >
+      `{path}` is a {btype} inside `{parent}`; its {type} port #{n}
+      is not wired. On an ASIL-D component an unwired interface is an
+      ambiguity in the architectural design: code generation will pick
+      a default (zero / Ground) that is invisible from the diagram and
+      that no review can confirm matches the requirement.
+    recommend:
+      - "Either route the intended signal into {type} port #{n} of
+         `{path}`, or close it explicitly with a Ground / Terminator so
+         the design intent is documented."
+    refs: ["MAB jc_0061 (signal connectivity)",
+           "ISO 26262-6:2018 §7.4.3 (unambiguous architectural design)"]
+
+  - id: ARCH-UNCONNECTED-SLAVE
+    category: model_arch
+    forEach:
+      var: port
+      in:  model.bms_slave.static.unconnected_ports_list
+    when: port.path != ""
+    bind:
+      path:   port.path
+      type:   port.type
+      n:      port.port
+      parent: port.parent
+      btype:  port.block_type
+    severity: major
+    finding: "Unconnected {type} port #{n} on {path}"
+    reasoning: >
+      `{path}` ({btype}) inside `{parent}` exposes an unwired {type}
+      port #{n}. bms_slave is ASIL C; an implicit zero-feed here can
+      mask a real comm fault from the master.
+    recommend:
+      - "Wire {type} port #{n} of `{path}` to its expected source, or
+         close it with a Ground / Terminator."
+    refs: ["MAB jc_0061"]
+
+  - id: ARCH-UNCONNECTED-PREDICTOR
+    category: model_arch
+    forEach:
+      var: port
+      in:  model.fault_predictor.static.unconnected_ports_list
+    when: port.path != ""
+    bind:
+      path:  port.path
+      type:  port.type
+      btype: port.block_type
+    severity: minor
+    finding: "Unconnected {type} port on {path}"
+    reasoning: >
+      `{path}` ({btype}) in fault_predictor has a dangling {type}
+      port. QM scope, but worth tidying before deployment.
+    recommend:
+      - "Wire the port or terminate it."
+
+  - id: ARCH-UNNAMED-INTER-SUBSYS
+    category: model_arch
+    forEach:
+      var: line
+      in:  model.bms_master.signals.unnamed_inter_subsys_list
+    when: line.path != ""
+    bind:
+      path: line.path
+      src:  line.src
+      dst:  line.dst
+    severity: minor
+    finding: "Unnamed signal crossing subsystem boundary at {path}"
+    reasoning: >
+      The line from `{src}` to `{dst}` (inside `{path}`) carries no
+      explicit signal name. Named signals are how reviewers and
+      requirement-trace tools follow data across subsystem boundaries
+      and how the generated C code names its globals.
+    recommend:
+      - "Click the line in `{path}` and set its name in the
+         Property Inspector, choosing a verb-noun consistent with the
+         requirement (e.g. SoC_Estimate, ContactorCmd_Open)."
+    refs: ["MAB na_0008 (signal labels)"]
+
+  - id: ARCH-BROKEN-LINK
+    category: model_arch
+    forEach:
+      var: lib
+      in:  model.bms_master.static.broken_links_list
+    when: lib.path != ""
+    bind:
+      path:   lib.path
+      status: lib.status
+    severity: critical
+    finding: "Unresolved library link at {path}"
+    reasoning: >
+      `{path}` references a library Simulink cannot resolve (status =
+      {status}). Code generation will either fail or build against a
+      stale shadow of the library master -- both unacceptable for an
+      ASIL-D component because the resulting binary no longer matches
+      the model that was reviewed.
+    recommend:
+      - "Restore the parent library on the MATLAB path, then right-click
+         `{path}` > Library Link > Resolve Library Links."
+      - "If the library is intentionally retired, replace `{path}` with
+         the in-model implementation and remove the link."
+
+  # ============= readability =========================================
+  - id: ARCH-DEFAULT-NAME-MASTER
+    category: model_arch
+    forEach:
+      var: g
+      in:  model.bms_master.static.default_named_by_parent_list
+    when: g.count >= 1
+    bind:
+      path:  g.parent
+      n:     g.count
+      names: g.names
+      types: g.types
+    severity: minor
+    finding: "Subsystem {path} contains {n} default-named blocks ({types}: {names})"
+    reasoning: >
+      Inside `{path}` there are {n} blocks still carrying Simulink's
+      auto-generated names ({names}). Reviewers cannot tell what each
+      block does without opening it; a single round of renaming makes
+      the whole subsystem self-documenting.
+    recommend:
+      - "Rename every default-named block in `{path}` after its
+         function (e.g. for a Gain use `<Signal>_Scale`, for a Sum use
+         `<Output>_Sum`, for a Switch use `<Selector>_Sel`)."
+    refs: ["MAB jc_0201 (usable characters for block names)"]
+
+  - id: ARCH-DEEP-NESTING
+    category: model_arch
+    forEach:
+      var: blk
+      in:  model.bms_master.static.deep_blocks_list
+    when: blk.depth > policy.arch.depth_max
+    bind:
+      path:  blk.path
+      depth: blk.depth
+      lim:   policy.arch.depth_max
+    severity: minor
+    finding: "Deeply nested block {path} (depth {depth}, limit {lim})"
+    reasoning: >
+      `{path}` lives {depth} subsystem levels deep. Beyond {lim}
+      levels review and Coverage instrumentation slow down and the
+      added boundaries usually carry no abstraction value.
+    recommend:
+      - "Promote `{path}` one or two levels by collapsing the
+         intermediate Subsystem boundary that adds no abstraction."
+    refs: ["MAB db_0140 (subsystem nesting)"]
+
+  - id: ARCH-LARGE-CHART
+    category: model_arch
+    forEach:
+      var: c
+      in:  model.bms_master.stateflow.charts
+    when: c.states > policy.arch.max_chart_states
+    bind:
+      path:   c.path
+      name:   c.name
+      states: c.states
+      lim:    policy.arch.max_chart_states
+    severity: major
+    finding: "Stateflow chart `{name}` at {path} has {states} states (limit {lim})"
+    reasoning: >
+      Chart `{name}` carries {states} states (above the {lim}-state
+      guideline). Charts this size are the dominant source of MC/DC
+      gaps in fault-handling logic and are difficult to review on a
+      single screen.
+    recommend:
+      - "Refactor `{name}` into hierarchical sub-charts grouped by mode
+         (e.g. Init / Run / Fault / Shutdown); each sub-chart should
+         hold ≤ {lim} states."
+    refs: ["MAB jc_0641 (Stateflow complexity)"]
+
+  # ============= structural complexity ===============================
+  - id: ARCH-LARGE-SUBSYS-MASTER
+    category: model_arch
+    forEach:
+      var: ss
+      in:  model.bms_master.static.large_subsystems_list
+    when: ss.n_blocks > policy.arch.large_subsys_blocks
+    bind:
+      path: ss.path
+      n:    ss.n_blocks
+      lim:  policy.arch.large_subsys_blocks
+    severity: major
+    finding: "Atomic subsystem {path} contains {n} blocks (limit {lim})"
+    reasoning: >
+      `{path}` is an atomic subsystem holding {n} direct children, well
+      above the {lim}-block guideline. Atomic units this large are the
+      dominant driver of cyclomatic complexity and MC/DC gaps in BMS
+      code, and become the bottleneck in code review.
+    recommend:
+      - "Split `{path}` into 2-3 smaller atomic subsystems grouped by
+         responsibility (e.g. estimation / protection / housekeeping)."
+
+  - id: ARCH-LARGE-SUBSYS-SLAVE
+    category: model_arch
+    forEach:
+      var: ss
+      in:  model.bms_slave.static.large_subsystems_list
+    when: ss.n_blocks > policy.arch.large_subsys_blocks
+    bind:
+      path: ss.path
+      n:    ss.n_blocks
+      lim:  policy.arch.large_subsys_blocks
+    severity: major
+    finding: "Atomic subsystem {path} (bms_slave) contains {n} blocks (limit {lim})"
+    reasoning: >
+      `{path}` holds {n} blocks above the {lim}-block guideline.
+    recommend:
+      - "Split `{path}` into smaller atomic subsystems."
+
+  - id: ARCH-WIDE-ATOMIC
+    category: model_arch
+    forEach:
+      var: ss
+      in:  model.bms_master.static.wide_atomic_subsystems_list
+    when: ss.path != ""
+    bind:
+      path:    ss.path
+      n_in:    ss.n_in
+      n_out:   ss.n_out
+      lim_in:  policy.arch.atomic_max_in
+      lim_out: policy.arch.atomic_max_out
+    severity: minor
+    finding: "Wide interface on atomic {path} ({n_in} in / {n_out} out)"
+    reasoning: >
+      `{path}` exposes {n_in} input and {n_out} output ports (limits
+      {lim_in} / {lim_out}). A wide interface is a cohesion smell:
+      the subsystem usually has more than one responsibility and the
+      generated function signature becomes hard to argue about during
+      review.
+    recommend:
+      - "Group related signals on `{path}` into bus objects, or split
+         the subsystem along its responsibility boundary."
+
+  - id: ARCH-HIGH-CYCLO-MASTER
+    category: model_arch
+    forEach:
+      var: ss
+      in:  model.bms_master.static.high_cyclo_subsystems_list
+    when: ss.value > policy.arch.cyclomatic_max
+    bind:
+      path:  ss.path
+      value: ss.value
+      lim:   policy.arch.cyclomatic_max
+    severity: major
+    finding: "Subsystem {path} has cyclomatic complexity {value} (limit {lim})"
+    reasoning: >
+      McCabe complexity {value} on `{path}` puts MC/DC closure out of
+      practical reach (each new linearly-independent path adds at
+      least one required test case). Above ~{lim} the unit is also
+      too dense for a single-pass code review.
+    recommend:
+      - "Split `{path}` along its top-level decision points (e.g. mode
+         multiplexers, fault arbiters); aim for cyclomatic ≤ 10 per
+         resulting subsystem."
+    refs: ["MAB jc_0641"]
+
+  - id: ARCH-ALG-LOOP
+    category: model_arch
+    forEach:
+      var: loop
+      in:  model.bms_master.static.algebraic_loops_list
+    when: loop.path != ""
+    bind:
+      path: loop.path
+    severity: critical
+    finding: "Algebraic loop involving {path}"
+    reasoning: >
+      `{path}` participates in an algebraic loop. Such loops are
+      non-deterministic on the embedded target -- Simulink Coder will
+      either refuse to generate code or insert a runtime solver call
+      that no WCET budget can absorb.
+    recommend:
+      - "Insert a `Unit Delay` (or `Memory`) block on the back edge of
+         the loop that includes `{path}`, breaking the
+         direct-feedthrough dependency. Re-run
+         `sldiagnostics(<model>, 'AlgebraicLoops')` to confirm."
+
+  # ============= data flow ===========================================
+  - id: ARCH-MAGIC-CONST
+    category: model_arch
+    forEach:
+      var: c
+      in:  model.bms_master.data.magic_constants_list
+    when: c.path != ""
+    bind:
+      path:   c.path
+      value:  c.value
+      parent: c.parent
+    severity: minor
+    finding: "Magic constant {value} at {path}"
+    reasoning: >
+      `{path}` holds the literal `{value}` directly in its dialog
+      instead of referencing a workspace variable or
+      `Simulink.Parameter`. Hard-coded numerics inside `{parent}`
+      cannot be calibrated, reviewed against requirements, or swapped
+      between variants without re-touching the model.
+    recommend:
+      - "Move `{value}` to a `Simulink.Parameter` in the data
+         dictionary used by this model and reference it by name from
+         `{path}`."
+    refs: ["MAB jc_0224 (use of named parameters)"]
+
+  - id: ARCH-DATA-STORE-GLOBAL
+    category: model_arch
+    forEach:
+      var: d
+      in:  model.bms_master.data.data_store_globals_list
+    when: d.path != ""
+    bind:
+      path: d.path
+      name: d.name
+    severity: minor
+    finding: "Global Data Store `{name}` at {path}"
+    reasoning: >
+      A model-root Data Store Memory acts as a hidden global: any
+      Read/Write block anywhere in the hierarchy can touch `{name}`,
+      but the diagram shows no signal line. This invisible coupling
+      makes regression analysis pessimistic.
+    recommend:
+      - "Replace `{name}` with explicit signal routing if the producer
+         and consumer are in known subsystems, or scope the Data Store
+         to the smallest common parent."
+
+  - id: ARCH-GOTO-GLOBAL
+    category: model_arch
+    forEach:
+      var: g
+      in:  model.bms_master.data.goto_global_list
+    when: g.path != ""
+    bind:
+      path: g.path
+      tag:  g.tag
+    severity: minor
+    finding: "Global Goto tag `{tag}` at {path}"
+    reasoning: >
+      The Goto at `{path}` uses global / scoped visibility, so its
+      destination is invisible from the diagram. MAB and the
+      ISO 26262-6 §7.4.3 unambiguity goal both prefer signal lines.
+    recommend:
+      - "Replace `{tag}` with a direct signal line, or restrict its
+         visibility to `local` and keep matching From blocks in the
+         same subsystem."
+
+  # ============= scheduling ==========================================
+  - id: ARCH-MULTIRATE
+    category: model_arch
+    when: model.bms_master.solver.distinct_rates > policy.arch.max_distinct_rates
+    bind:
+      n:   model.bms_master.solver.distinct_rates
+      lim: policy.arch.max_distinct_rates
+    severity: minor
+    finding: "bms_master uses {n} distinct sample rates (limit {lim})"
+    reasoning: >
+      The schedule has {n} distinct rates ({lim} is the guideline).
+      Beyond that, the generated code's task table grows and WCET
+      analysis becomes pessimistic because rare slow tasks have to be
+      assumed worst-case in every base period.
+    recommend:
+      - "Display > Sample Time > Colors to inspect the legend, then
+         consolidate close-by rates onto a common base or isolate slow
+         paths behind explicit Rate Transition blocks."
+
+  - id: ARCH-MISSING-RT
+    category: model_arch
+    forEach:
+      var: r
+      in:  model.bms_master.rates.missing_rate_transitions
+    when: r.path != ""
+    bind:
+      path:   r.path
+      src_ts: r.src_ts
+      dst_ts: r.dst_ts
+    severity: minor
+    finding: "Implicit rate transition at {path} ({src_ts}s -> {dst_ts}s)"
+    reasoning: >
+      `{path}` feeds a destination running at a different sample rate
+      ({src_ts}s vs {dst_ts}s) without an explicit Rate Transition
+      block. Simulink will insert one automatically with default
+      determinism / data-integrity settings -- which may or may not
+      match the requirement.
+    recommend:
+      - "Insert an explicit Rate Transition between `{path}` and its
+         destination and choose the appropriate
+         `Ensure data integrity` / `Ensure deterministic transfer`
+         options for the use-case."
+
+  # ============= embedded code (MATLAB Function blocks) ==============
+  - id: ARCH-MLFN-LARGE-MASTER
+    category: model_arch
+    forEach:
+      var: f
+      in:  model.bms_master.codeblock.matlab_function_blocks_list
+    when: f.loc > policy.arch.mlfn_max_loc
+    bind:
+      path: f.path
+      name: f.name
+      loc:  f.loc
+      lim:  policy.arch.mlfn_max_loc
+    severity: minor
+    finding: "MATLAB Function `{name}` at {path} has {loc} LoC (limit {lim})"
+    reasoning: >
+      Embedded MATLAB blocks are a hand-off boundary between modelled
+      and hand-written code; large scripts inside the model are harder
+      to review than equivalent block diagrams and tend to accumulate
+      hidden state.
+    recommend:
+      - "Split `{name}` into a smaller MATLAB Function and a
+         supporting Subsystem, or move the body to a versioned
+         `+pkg` MATLAB function called from a thin wrapper block."
+
+  - id: ARCH-MLFN-NESTED
+    category: model_arch
+    forEach:
+      var: f
+      in:  model.bms_master.codeblock.matlab_function_blocks_list
+    when: f.max_nesting > policy.arch.mlfn_max_nesting
+    bind:
+      path: f.path
+      name: f.name
+      nest: f.max_nesting
+      lim:  policy.arch.mlfn_max_nesting
+    severity: minor
+    finding: "MATLAB Function `{name}` at {path} nests {nest} levels deep (limit {lim})"
+    reasoning: >
+      Deep control-flow nesting is the standard predictor of MC/DC
+      gaps and review fatigue. {nest} levels of if/for/while/switch
+      inside `{name}` is above the {lim}-level guideline.
+    recommend:
+      - "Flatten the body of `{name}` with early-return guards or
+         lookup tables; aim for ≤ {lim} levels of nesting."

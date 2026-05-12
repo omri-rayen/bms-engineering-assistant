@@ -14,7 +14,8 @@
     "bms_sil_equivalence":     ["SIL"],
     "predictor_functional":    ["MIL"],
     "predictor_on_target":     ["PIL"],
-    "real_time_wcet":          ["PIL"]
+    "real_time_wcet":          ["PIL"],
+    "bms_dead_code_coverage":  ["COV"]
   },
   "thresholds_source": "model/system/params/init_system.m (single source of truth)",
 
@@ -43,6 +44,11 @@
       "id": "REQ-HL-PRD-01",
       "component": "predictor",
       "text": "The embedded LSTM fault predictor SHALL output, at every BMS step, a per-class probability vector prob_3 and a binary alarm vector alarm_3 for the three classes (OT, OV, UV), and SHALL raise alarms ahead of the corresponding BMS warn-level fault flags. The predictor is informational only: it SHALL NOT take any proactive action on the plant."
+    },
+    {
+      "id": "REQ-HL-COV-01",
+      "component": "bms",
+      "text": "The smart BMS (bms_master + bms_slave + embedded fault_predictor) SHALL contain no dead design elements: every block, decision branch, condition and Stateflow transition SHALL be reachable by the BMS validation stimulus."
     }
   ],
 
@@ -193,6 +199,79 @@
     },
 
     {
+      "id": "REQ-LL-BMS-AGG-01",
+      "parent": "REQ-HL-BMS-01",
+      "component": "bms_master",
+      "function": "signal_aggregation",
+      "phases": ["MIL", "SIL"],
+      "text": "Signal_Aggregator min/max trees in bms_master SHALL report the correct extremum across all 96 cell voltages and all 32 temperature sensors when a spike or dip is moved across every channel index."
+    },
+    {
+      "id": "REQ-LL-BMS-AGG-02",
+      "parent": "REQ-HL-BMS-01",
+      "component": "bms_slave",
+      "function": "signal_aggregation",
+      "phases": ["MIL", "SIL"],
+      "text": "Per-slave MinMax aggregator and balancer cell-argmax SHALL identify the correct cell index when the spike/dip moves across every cell of the 12-cell module."
+    },
+    {
+      "id": "REQ-LL-BMS-BAL-03",
+      "parent": "REQ-HL-BMS-01",
+      "component": "bms_master",
+      "function": "balancing_arbitration",
+      "phases": ["MIL", "SIL"],
+      "text": "Balancing_Arbitrator SHALL select different modules for balancing as the cell-spread pattern moves across the pack while SoC > bms.bal_SoC_min and current is near rest, ensuring every module is exercised at least once over the sweep."
+    },
+    {
+      "id": "REQ-LL-BMS-FSM-02",
+      "parent": "REQ-HL-BMS-01",
+      "component": "bms_master",
+      "function": "fault_severity_fsm",
+      "phases": ["MIL", "SIL"],
+      "text": "Per-slave fault propagation: each of the 8 slave channels in fault_flags_8, taken alone, SHALL be sufficient to drive the master FSM through Warn -> Derate -> Shut as severity increases."
+    },
+    {
+      "id": "REQ-LL-BMS-PRD-01",
+      "parent": "REQ-HL-BMS-01",
+      "component": "bms_master",
+      "function": "fault_decode",
+      "phases": ["MIL", "SIL"],
+      "text": "Decode_Fault_Flags SHALL walk every fault class (OV/UV/OT/UT) through none -> warn -> derate -> shut on a single slave at a time using the encoded fault_flags_8 input (2 bits per class: OV=bits0-1, UV=bits2-3, OT=bits4-5, UT=bits6-7)."
+    },
+    {
+      "id": "REQ-LL-BMS-PWR-02",
+      "parent": "REQ-HL-BMS-01",
+      "component": "bms_master",
+      "function": "power_limitation",
+      "phases": ["MIL", "SIL"],
+      "text": "Power_Limiter min(k_soc, k_temp) selector SHALL pick k_soc when SoC is low (warm cells) and SHALL pick k_temp when SoC is nominal but cells are very cold."
+    },
+    {
+      "id": "REQ-LL-BMS-SOH-02",
+      "parent": "REQ-HL-BMS-01",
+      "component": "bms_master",
+      "function": "soh_estimation",
+      "phases": ["MIL", "SIL"],
+      "text": "Sustained discharge accumulating |dSoC| >= 10 % SHALL trigger one update of SoH_cap_est via the coulomb-counting branch, and a sustained high-current segment SHALL update R0 via the EMA branch."
+    },
+    {
+      "id": "REQ-LL-BMS-THM-02",
+      "parent": "REQ-HL-BMS-01",
+      "component": "bms_master",
+      "function": "thermal_management",
+      "phases": ["MIL", "SIL"],
+      "text": "Thermal_Manager SHALL hit heater/chiller saturation limits and SHALL cross both relay edges (turn-on and turn-off hysteresis) when temperature is swept across the full operating range."
+    },
+    {
+      "id": "REQ-LL-BMS-WDG-02",
+      "parent": "REQ-HL-BMS-01",
+      "component": "bms_master",
+      "function": "slave_watchdog",
+      "phases": ["MIL", "SIL"],
+      "text": "Slave_Watchdog severity SHALL scale with the count of frozen slave channels: 0 frozen -> Nominal, 1 -> Warn, 2-3 -> Derate, 4+ -> Shut, after each channel exceeds bms.N_watchdog_timeout consecutive frozen steps."
+    },
+
+    {
       "id": "REQ-LL-BMS-HWP-01",
       "parent": "REQ-HL-BMS-01",
       "component": "system_model",
@@ -207,7 +286,7 @@
       "component": "fault_predictor",
       "function": "lead_time_OT",
       "phases": ["MIL"],
-      "text": "Across all OT injection scenarios x test-split trips, the median per-event alarm_3(OT) lead time vs the BMS Nominal->Warn(OT) transition SHALL be >= 15 s. Justification: the LSTM is trained with a 30 s OT look-ahead horizon (H_OT_samples=300); a trained classifier fires near the centre of its discriminative window so the natural median-lead ceiling is ~H/2 = 15 s. 15 s also provides 14 s of margin above the BMS warn-fault debounce (1 s at dt=0.1 s) which is enough for a thermal control-loop response."
+      "text": "Across all OT injection scenarios x test-split trips, the median per-event alarm_3(OT) lead time vs the BMS Nominal->Warn(OT) transition SHALL be >= req.PRD_LT_OT_min_s (30 s, equal to the LSTM training horizon H_OT=300 samples at dt=0.1 s). Lead = (y_true_start - first_alarm_idx)*dt + H*dt, where y_true marks samples within H of a warn crossing."
     },
     {
       "id": "REQ-LL-PRD-LT-02",
@@ -215,7 +294,7 @@
       "component": "fault_predictor",
       "function": "lead_time_OV",
       "phases": ["MIL"],
-      "text": "Across all OV injection scenarios x test-split trips, the median per-event alarm_3(OV) lead time vs the BMS Nominal->Warn(OV) transition SHALL be >= 10 s."
+      "text": "Across all OV injection scenarios x test-split trips, the median per-event alarm_3(OV) lead time vs the BMS Nominal->Warn(OV) transition SHALL be >= req.PRD_LT_OV_min_s (10 s, equal to H_OV=100 samples)."
     },
     {
       "id": "REQ-LL-PRD-LT-03",
@@ -223,7 +302,7 @@
       "component": "fault_predictor",
       "function": "lead_time_UV",
       "phases": ["MIL"],
-      "text": "Across all UV injection scenarios x test-split trips, the median per-event alarm_3(UV) lead time vs the BMS Nominal->Warn(UV) transition SHALL be >= 10 s."
+      "text": "Across all UV injection scenarios x test-split trips, the median per-event alarm_3(UV) lead time vs the BMS Nominal->Warn(UV) transition SHALL be >= req.PRD_LT_UV_min_s (10 s, equal to H_UV=100 samples)."
     },
     {
       "id": "REQ-LL-PRD-DR-01",
@@ -276,6 +355,15 @@
       "function": "lstm_on_target",
       "phases": ["PIL"],
       "text": "The embedded LSTM fault predictor, executing inside bms_master on the STM32H7A3 (ARM Cortex-M7 @ 280 MHz) in PIL mode, SHALL produce prob_3 outputs with a maximum absolute error <= 1e-3 per class compared to MIL reference values, across the OT, OV and UV fault scenarios. This confirms correct floating-point operation, memory layout and LSTM inference pipeline on the target processor."
+    },
+
+    {
+      "id": "REQ-LL-COV-DEAD-01",
+      "parent": "REQ-HL-COV-01",
+      "component": "bms",
+      "function": "dead_code_coverage",
+      "phases": ["COV"],
+        "text": "Cumulative Simulink Coverage of bms_master, bms_slave and fault_predictor under the BMS MIL stimulus set SHALL leave no more than req.COV_dead_pct_max (default 0 %) of design blocks unexecuted. Execution coverage is the canonical model-level dead-code proxy: an unexecuted block is unreachable design. Decision, Condition and MCDC results are recorded in the report as informational stimulus-coverage metrics only and do not gate the verdict."
     }
   ]
 }

@@ -1,25 +1,21 @@
-% Generate the fault-prediction dataset.
-%
-% For each (trip, scenario) pair: set the trip's natural starting state,
-% apply the scenario's fault injection, run MIL_model, extract features and
-% look-ahead labels, and append to results. Writes dataset.mat + log.csv.
+% Generate fault-prediction dataset.
+% Runs each (trip, scenario) pair, extracts features + labels, writes dataset.mat + log.csv.
 
 %% Paths
-scriptDir = fileparts(mfilename('fullpath'));            % .../scripts/matlab
-fpRoot    = fileparts(fileparts(scriptDir));             % .../fault_prediction
-aiRoot    = fileparts(fpRoot);                           % .../ai
-projRoot  = fileparts(aiRoot);                           % project root
+scriptDir = fileparts(mfilename('fullpath'));
+fpRoot    = fileparts(fileparts(scriptDir));
+aiRoot    = fileparts(fpRoot);
+projRoot  = fileparts(aiRoot);
 modelRoot = fullfile(projRoot, 'model');
-sysParams = fullfile(modelRoot, 'system', 'params');     % init_system.m + cell_variability.mat
-sysModels = fullfile(modelRoot, 'system', 'models');     % system_model.slx (was MIL_model)
+sysParams = fullfile(modelRoot, 'system', 'params');
+sysModels = fullfile(modelRoot, 'system', 'models');
 outDir    = fullfile(fpRoot, 'data');
 
 % The validator module pulls in every model + fault-injection helper.
 if ~isfolder(outDir), mkdir(outDir); end
 
 %% Init workspace and load model
-% Always start with a fresh seed-42 cell variability draw so the dataset
-% and the MIL evaluation use identical pack dispersion.
+% fresh seed-42 cell variability so dataset and MIL eval use identical pack dispersion
 cellVarFile = fullfile(sysParams, 'cell_variability.mat');
 if isfile(cellVarFile), delete(cellVarFile); end
 clear cell_Q_Ah cell_dSoC_pct cell_RO_scale   % don't let stale workspace vars bypass the seed
@@ -29,9 +25,7 @@ mdl = 'system_model';
 load_system(fullfile(sysModels, mdl));
 set_param(mdl, 'SimulationMode', 'accelerator');
 
-% Trips picked to cover SoC / temperature / current ranges and to balance
-% the three fault classes (warm long A-trips for OT, high-SoC for OV,
-% low-SoC long trips for UV).
+% 28 trips covering OT / OV / UV conditions
 trip_ids = { ...
     'TripA06','TripA08','TripA16','TripA19','TripA21','TripA22', ...
     'TripA32','TripA11','TripA05','TripA01', ...

@@ -160,7 +160,7 @@ predictor.H_OT_samples   = 300;   % 30 s lookahead for OT
 predictor.H_OV_samples   = 100;   % 10 s lookahead for OV
 predictor.H_UV_samples   = 100;   % 10 s lookahead for UV
 predictor.LAG_samples    =   5;   % backward-difference lag for dV/dT features
-predictor.LOOKBACK_samples = 200; % event-search horizon for lead-time scoring
+predictor.LOOKBACK_samples = 600; % event-search horizon for lead-time scoring (60 s, > max H_OT=30s + margin)
 
 %% Requirement thresholds (mirror of validator/requirements/requirements.json)
 % Plant convergence (REQ-LL-PLT-*)
@@ -181,16 +181,12 @@ req.BMS_BAL_max_spread_V     = 0.200;  % OEM safety envelope on max(V_cell)
                                        % full equalisation accumulates
                                        % across rest periods.
 % Predictor (REQ-LL-PRD-*)
-% Median per-event alarm lead time vs the BMS Nominal->Warn transition.
-% A classifier trained with look-ahead horizon H fires near the middle of
-% [event-H, event] when the signal becomes discriminative; therefore the
-% achievable MEDIAN lead is bounded by ~H/2, not H. With H_OT=300 (30 s)
-% the natural ceiling is ~15 s; matched by both the previous project's
-% MIL recording and the current closed-loop run. OV/UV use H=100 (10 s)
-% so the natural ceiling is ~5 s, and the requirement allows the full
-% horizon since for short windows the LSTM tends to fire close to event
-% start.
-req.PRD_LT_OT_min_s = 15.0;
+% Median per-event alarm lead time vs the BMS Nominal->Warn crossing.
+% Targets equal the per-class training look-ahead horizons:
+% H_OT=30 s (300 samples), H_OV=10 s (100 samples), H_UV=10 s (100 samples).
+% A perfectly trained classifier transitions from negative to positive
+% at the first labelled sample (= warn_idx - H), giving lead = H.
+req.PRD_LT_OT_min_s = 30.0;
 req.PRD_LT_OV_min_s = 10.0;
 req.PRD_LT_UV_min_s = 10.0;
 % Per-class detection-rate floor.
@@ -213,6 +209,10 @@ req.RT_WCET_warmup       = 5;        % skip cold-start steps (LSTM weights, cach
 req.RT_WCET_min_steps    = 300;
 req.RT_RAM_max_kb        = 256;      % static RAM (data+bss) budget on STM32H7A3 (1.4 MB total)
 req.PIL_PRD_prob_abs_tol = 1e-3;
+% Dead-code coverage on the BMS (REQ-LL-COV-DEAD-01).
+% Execution is the canonical model-level dead-code proxy; decision,
+% condition and MCDC are informational only (recorded in the report).
+req.COV_dead_pct_max = 0.0;          % no unexecuted blocks allowed
 
 %% Bus objects from data dictionary
 dd      = Simulink.data.dictionary.open(INIT_BUS_FILE);

@@ -1,0 +1,738 @@
+{
+  "schema_version": "1.0",
+  "timestamp": "20260509_014026",
+  "inputs": {
+    "facts": "analyzer\\reports\\_smoke\\FACTS.json",
+    "coverage": "analyzer\\reports\\_smoke\\COV.json",
+    "mil": "validator\\reports\\MIL.json",
+    "sil": "validator\\reports\\SIL.json",
+    "pil": "validator\\reports\\PIL.json",
+    "requirements": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\requirements\\requirements.json"
+  },
+  "summary": {
+    "n_findings": 17,
+    "by_severity": {
+      "info": 0,
+      "minor": 5,
+      "major": 6,
+      "critical": 6
+    },
+    "by_category": {
+      "dead_code": 5,
+      "model_arch": 12
+    },
+    "verdict": "blocking"
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "rule_id": "DC-MASTER-BLOCK",
+      "category": "dead_code",
+      "severity": "critical",
+      "finding": "bms_master execution dead at bms_master/Estimation/SOC_Estimator/Branch_If_Empty  (0/1 covered)",
+      "reasoning": "ASIL-D requires statement, branch and MC/DC coverage. A block whose counter is below 100% is either unreachable or under-stimulated.",
+      "recommend": [
+        "Open `{path}` with hilite_system in MATLAB and inspect the missing path (true/false branch, untoggled operand, etc.).",
+        "Add a MIL test that drives the missing case, or remove the dead logic and re-baseline the model."
+      ],
+      "refs": [
+        "ISO 26262-6:2018, table 7"
+      ],
+      "evidence": {
+        "facts_used": [
+          "blk.hit",
+          "blk.metric",
+          "blk.path",
+          "blk.total"
+        ],
+        "values": {
+          "path": "bms_master/Estimation/SOC_Estimator/Branch_If_Empty",
+          "metric": "execution",
+          "hit": 0,
+          "total": 1
+        }
+      }
+    },
+    {
+      "id": "F-002",
+      "rule_id": "DC-MASTER-BLOCK",
+      "category": "dead_code",
+      "severity": "critical",
+      "finding": "bms_master decision dead at bms_master/Protection/OverV_Trip  (1/2 covered)",
+      "reasoning": "ASIL-D requires statement, branch and MC/DC coverage. A block whose counter is below 100% is either unreachable or under-stimulated.",
+      "recommend": [
+        "Open `{path}` with hilite_system in MATLAB and inspect the missing path (true/false branch, untoggled operand, etc.).",
+        "Add a MIL test that drives the missing case, or remove the dead logic and re-baseline the model."
+      ],
+      "refs": [
+        "ISO 26262-6:2018, table 7"
+      ],
+      "evidence": {
+        "facts_used": [
+          "blk.hit",
+          "blk.metric",
+          "blk.path",
+          "blk.total"
+        ],
+        "values": {
+          "path": "bms_master/Protection/OverV_Trip",
+          "metric": "decision",
+          "hit": 1,
+          "total": 2
+        }
+      }
+    },
+    {
+      "id": "F-003",
+      "rule_id": "DC-MASTER-BLOCK",
+      "category": "dead_code",
+      "severity": "critical",
+      "finding": "bms_master decision dead at bms_master/Protection/UnderV_Trip  (1/2 covered)",
+      "reasoning": "ASIL-D requires statement, branch and MC/DC coverage. A block whose counter is below 100% is either unreachable or under-stimulated.",
+      "recommend": [
+        "Open `{path}` with hilite_system in MATLAB and inspect the missing path (true/false branch, untoggled operand, etc.).",
+        "Add a MIL test that drives the missing case, or remove the dead logic and re-baseline the model."
+      ],
+      "refs": [
+        "ISO 26262-6:2018, table 7"
+      ],
+      "evidence": {
+        "facts_used": [
+          "blk.hit",
+          "blk.metric",
+          "blk.path",
+          "blk.total"
+        ],
+        "values": {
+          "path": "bms_master/Protection/UnderV_Trip",
+          "metric": "decision",
+          "hit": 1,
+          "total": 2
+        }
+      }
+    },
+    {
+      "id": "F-004",
+      "rule_id": "DC-MASTER-DEC-OVER",
+      "category": "dead_code",
+      "severity": "critical",
+      "finding": "bms_master decision dead = 2.80% (ASIL D, limit 0.0%)",
+      "reasoning": "Every untaken branch in an ASIL-D model is a logical path that has never been verified. ISO 26262-6 table 7 requires branch coverage at ASIL B and above.",
+      "recommend": [],
+      "refs": [
+        "ISO 26262-6:2018, table 7"
+      ],
+      "evidence": {
+        "facts_used": [
+          "coverage.bms_master.decision.dead_pct",
+          "policy.component_asil.bms_master",
+          "policy.limits.bms_master.dec"
+        ],
+        "values": {
+          "asil": "D",
+          "value": 2.8,
+          "limit": 0
+        }
+      }
+    },
+    {
+      "id": "F-005",
+      "rule_id": "DC-MASTER-MCDC-OVER",
+      "category": "dead_code",
+      "severity": "minor",
+      "finding": "bms_master MC/DC dead = 90.20% (limit 0.0%)",
+      "reasoning": "MC/DC closure on legacy logic is hard. A small residual is usually accepted with rationale rather than re-architected.",
+      "recommend": [],
+      "refs": [
+        "ISO 26262-6:2018 \u00a79.4.5"
+      ],
+      "evidence": {
+        "facts_used": [
+          "coverage.bms_master.mcdc.dead_pct",
+          "policy.limits.bms_master.mcdc"
+        ],
+        "values": {
+          "value": 90.2,
+          "limit": 0
+        }
+      }
+    },
+    {
+      "id": "F-006",
+      "rule_id": "ARCH-ALG-LOOP",
+      "category": "model_arch",
+      "severity": "critical",
+      "finding": "bms_master: algebraic loop involving bms_master/Estimation/SOC_Loop",
+      "reasoning": "Algebraic loops are non-deterministic on the embedded target and Simulink Coder usually refuses to generate code for them.",
+      "recommend": [
+        "Insert a Unit Delay or a Memory block on the back edge of `{path}` (or refactor the loop out)."
+      ],
+      "refs": [],
+      "evidence": {
+        "facts_used": [
+          "loop.path"
+        ],
+        "values": {
+          "path": "bms_master/Estimation/SOC_Loop"
+        }
+      }
+    },
+    {
+      "id": "F-007",
+      "rule_id": "ARCH-BROKEN-LINK-MASTER",
+      "category": "model_arch",
+      "severity": "critical",
+      "finding": "bms_master: unresolved library link at bms_master/Library_Wrappers/CellLib_Adapter (unresolved)",
+      "reasoning": "A broken library link means the block in the diagram does not reflect the library master. Code generation will either fail or silently use a stale variant -- both are unacceptable for an ASIL-D component.",
+      "recommend": [
+        "Open `{path}`, restore the library on the path and re-link (Diagram > Library Link > Resolve Library Links)."
+      ],
+      "refs": [],
+      "evidence": {
+        "facts_used": [
+          "lib.path",
+          "lib.status"
+        ],
+        "values": {
+          "path": "bms_master/Library_Wrappers/CellLib_Adapter",
+          "status": "unresolved"
+        }
+      }
+    },
+    {
+      "id": "F-008",
+      "rule_id": "ARCH-DEEP-NESTING",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "bms_master: deeply nested block bms_master/L1/L2/L3/L4/L5/L6/L7/L8/L9/Const (depth 9, limit 7)",
+      "reasoning": "Nesting beyond ~7 levels makes navigation and review painful and makes Stateflow / coverage instrumentation slower.",
+      "recommend": [
+        "Lift `{path}` one or two levels up by promoting its parent subsystem boundary."
+      ],
+      "refs": [],
+      "evidence": {
+        "facts_used": [
+          "blk.depth",
+          "blk.path",
+          "policy.arch.depth_max"
+        ],
+        "values": {
+          "path": "bms_master/L1/L2/L3/L4/L5/L6/L7/L8/L9/Const",
+          "depth": 9,
+          "lim": 7
+        }
+      }
+    },
+    {
+      "id": "F-009",
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "bms_master: block bms_master/Estimation/Gain1 keeps default name `Gain1` (Gain)",
+      "reasoning": "Default block names hide intent and break traceability between requirements and implementation. MAAB jc_0201 forbids them in production models.",
+      "recommend": [
+        "Rename `{path}` after its function (e.g. `SOC_Estimator_Gain`)."
+      ],
+      "refs": [
+        "MAAB jc_0201"
+      ],
+      "evidence": {
+        "facts_used": [
+          "blk.name",
+          "blk.path",
+          "blk.type"
+        ],
+        "values": {
+          "path": "bms_master/Estimation/Gain1",
+          "name": "Gain1",
+          "type": "Gain"
+        }
+      }
+    },
+    {
+      "id": "F-010",
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "bms_master: block bms_master/Protection/Sum2 keeps default name `Sum2` (Sum)",
+      "reasoning": "Default block names hide intent and break traceability between requirements and implementation. MAAB jc_0201 forbids them in production models.",
+      "recommend": [
+        "Rename `{path}` after its function (e.g. `SOC_Estimator_Gain`)."
+      ],
+      "refs": [
+        "MAAB jc_0201"
+      ],
+      "evidence": {
+        "facts_used": [
+          "blk.name",
+          "blk.path",
+          "blk.type"
+        ],
+        "values": {
+          "path": "bms_master/Protection/Sum2",
+          "name": "Sum2",
+          "type": "Sum"
+        }
+      }
+    },
+    {
+      "id": "F-011",
+      "rule_id": "ARCH-HIGH-CYCLO-MASTER",
+      "category": "model_arch",
+      "severity": "major",
+      "finding": "bms_master: subsystem bms_master/Protection/Fault_Manager has cyclomatic complexity 47 (>30)",
+      "reasoning": "McCabe complexity above ~30 in a single subsystem makes MC/DC closure impractical and indicates the unit needs a split.",
+      "recommend": [
+        "Split `{path}` along its decision points; aim for cyclomatic \u2264 10 per resulting subsystem."
+      ],
+      "refs": [
+        "MAAB jc_0641, ISO 26262-6:2018 \u00a78.4.5"
+      ],
+      "evidence": {
+        "facts_used": [
+          "ss.path",
+          "ss.value"
+        ],
+        "values": {
+          "path": "bms_master/Protection/Fault_Manager",
+          "value": 47
+        }
+      }
+    },
+    {
+      "id": "F-012",
+      "rule_id": "ARCH-LARGE-CHART",
+      "category": "model_arch",
+      "severity": "major",
+      "finding": "bms_master: Stateflow chart `Master_FSM` at bms_master/Mode_Manager/Master_FSM has 55 states (limit 40)",
+      "reasoning": "Charts beyond ~40 states become hard to review and are the single biggest source of MC/DC gaps in BMS contactor / fault-handling logic.",
+      "recommend": [
+        "Split `{path}` into hierarchical sub-charts grouped by mode."
+      ],
+      "refs": [],
+      "evidence": {
+        "facts_used": [
+          "c.name",
+          "c.path",
+          "c.states",
+          "policy.arch.max_chart_states"
+        ],
+        "values": {
+          "path": "bms_master/Mode_Manager/Master_FSM",
+          "name": "Master_FSM",
+          "states": 55,
+          "lim": 40
+        }
+      }
+    },
+    {
+      "id": "F-013",
+      "rule_id": "ARCH-LARGE-SUBSYS-MASTER",
+      "category": "model_arch",
+      "severity": "major",
+      "finding": "bms_master: atomic subsystem bms_master/Estimation/SOC_Estimator contains 145 blocks (limit 100)",
+      "reasoning": "Atomic subsystems above ~100 blocks are hard to review and harder to cover in MIL/SIL. They are the single biggest driver of cyclomatic blow-up in BMS code.",
+      "recommend": [
+        "Refactor `{path}` into 2-3 smaller atomic subsystems grouped by responsibility (e.g. estimation / protection / housekeeping)."
+      ],
+      "refs": [],
+      "evidence": {
+        "facts_used": [
+          "policy.arch.large_subsys_blocks",
+          "ss.n_blocks",
+          "ss.path"
+        ],
+        "values": {
+          "path": "bms_master/Estimation/SOC_Estimator",
+          "n": 145,
+          "lim": 100
+        }
+      }
+    },
+    {
+      "id": "F-014",
+      "rule_id": "ARCH-MASTER-MULTIRATE",
+      "category": "model_arch",
+      "severity": "minor",
+      "finding": "bms_master uses 5 distinct sample rates (limit 4)",
+      "reasoning": "Too many sample rates blow up the schedule on the target and make WCET analysis very pessimistic. Aim for \u2264 4 explicit rates.",
+      "recommend": [
+        "Consolidate close-by rates onto a common base rate, or use rate transitions to isolate the slow paths."
+      ],
+      "refs": [],
+      "evidence": {
+        "facts_used": [
+          "model.bms_master.solver.distinct_rates",
+          "policy.arch.max_distinct_rates"
+        ],
+        "values": {
+          "n": 5,
+          "lim": 4
+        }
+      }
+    },
+    {
+      "id": "F-015",
+      "rule_id": "ARCH-UNCONNECTED-MASTER",
+      "category": "model_arch",
+      "severity": "major",
+      "finding": "bms_master: unconnected Inport port #2 on bms_master/Signal_Aggregator/Decode_Fault_Flags/Logical Operator",
+      "reasoning": "An unconnected port is either a wiring mistake or design rot. In a safety model it routinely produces silent zero/NaN propagation that MIL test cases cannot detect. ISO 26262-6 \u00a77.4.4 calls for the absence of unintended functions.",
+      "recommend": [
+        "Open `{path}` and either connect the dangling port or terminate it explicitly with a Terminator/Ground block."
+      ],
+      "refs": [
+        "ISO 26262-6:2018 \u00a77.4.4 (a)"
+      ],
+      "evidence": {
+        "facts_used": [
+          "port.path",
+          "port.port",
+          "port.type"
+        ],
+        "values": {
+          "path": "bms_master/Signal_Aggregator/Decode_Fault_Flags/Logical Operator",
+          "type": "Inport",
+          "n": 2
+        }
+      }
+    },
+    {
+      "id": "F-016",
+      "rule_id": "ARCH-UNCONNECTED-MASTER",
+      "category": "model_arch",
+      "severity": "major",
+      "finding": "bms_master: unconnected Outport port #1 on bms_master/Protection/Contactor_Logic/Switch",
+      "reasoning": "An unconnected port is either a wiring mistake or design rot. In a safety model it routinely produces silent zero/NaN propagation that MIL test cases cannot detect. ISO 26262-6 \u00a77.4.4 calls for the absence of unintended functions.",
+      "recommend": [
+        "Open `{path}` and either connect the dangling port or terminate it explicitly with a Terminator/Ground block."
+      ],
+      "refs": [
+        "ISO 26262-6:2018 \u00a77.4.4 (a)"
+      ],
+      "evidence": {
+        "facts_used": [
+          "port.path",
+          "port.port",
+          "port.type"
+        ],
+        "values": {
+          "path": "bms_master/Protection/Contactor_Logic/Switch",
+          "type": "Outport",
+          "n": 1
+        }
+      }
+    },
+    {
+      "id": "F-017",
+      "rule_id": "ARCH-UNCONNECTED-SLAVE",
+      "category": "model_arch",
+      "severity": "major",
+      "finding": "bms_slave: unconnected Outport port #3 on bms_slave/Comm/RX_Decoder/Demux",
+      "reasoning": "",
+      "recommend": [
+        "Open `{path}` and either connect the dangling port or terminate it explicitly with a Terminator/Ground block."
+      ],
+      "refs": [],
+      "evidence": {
+        "facts_used": [
+          "port.path",
+          "port.port",
+          "port.type"
+        ],
+        "values": {
+          "path": "bms_slave/Comm/RX_Decoder/Demux",
+          "type": "Outport",
+          "n": 3
+        }
+      }
+    }
+  ],
+  "trace": [
+    {
+      "pass": 1,
+      "rule_id": "DC-MASTER-BLOCK",
+      "category": "dead_code",
+      "source": "dead_code.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Estimation/SOC_Estimator/Branch_If_Empty",
+        "metric": "execution",
+        "hit": 0,
+        "total": 1
+      },
+      "facts": [
+        "blk.hit",
+        "blk.metric",
+        "blk.path",
+        "blk.total"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "DC-MASTER-BLOCK",
+      "category": "dead_code",
+      "source": "dead_code.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Protection/OverV_Trip",
+        "metric": "decision",
+        "hit": 1,
+        "total": 2
+      },
+      "facts": [
+        "blk.hit",
+        "blk.metric",
+        "blk.path",
+        "blk.total"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "DC-MASTER-BLOCK",
+      "category": "dead_code",
+      "source": "dead_code.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Protection/UnderV_Trip",
+        "metric": "decision",
+        "hit": 1,
+        "total": 2
+      },
+      "facts": [
+        "blk.hit",
+        "blk.metric",
+        "blk.path",
+        "blk.total"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "DC-MASTER-DEC-OVER",
+      "category": "dead_code",
+      "source": "dead_code.yaml",
+      "fired": true,
+      "bindings": {
+        "asil": "D",
+        "value": 2.8,
+        "limit": 0
+      },
+      "facts": [
+        "coverage.bms_master.decision.dead_pct",
+        "policy.component_asil.bms_master",
+        "policy.limits.bms_master.dec"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "DC-MASTER-MCDC-OVER",
+      "category": "dead_code",
+      "source": "dead_code.yaml",
+      "fired": true,
+      "bindings": {
+        "value": 90.2,
+        "limit": 0
+      },
+      "facts": [
+        "coverage.bms_master.mcdc.dead_pct",
+        "policy.limits.bms_master.mcdc"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-ALG-LOOP",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Estimation/SOC_Loop"
+      },
+      "facts": [
+        "loop.path"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-BROKEN-LINK-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Library_Wrappers/CellLib_Adapter",
+        "status": "unresolved"
+      },
+      "facts": [
+        "lib.path",
+        "lib.status"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-DEEP-NESTING",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/L1/L2/L3/L4/L5/L6/L7/L8/L9/Const",
+        "depth": 9,
+        "lim": 7
+      },
+      "facts": [
+        "blk.depth",
+        "blk.path",
+        "policy.arch.depth_max"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Estimation/Gain1",
+        "name": "Gain1",
+        "type": "Gain"
+      },
+      "facts": [
+        "blk.name",
+        "blk.path",
+        "blk.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-DEFAULT-NAME-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Protection/Sum2",
+        "name": "Sum2",
+        "type": "Sum"
+      },
+      "facts": [
+        "blk.name",
+        "blk.path",
+        "blk.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-HIGH-CYCLO-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Protection/Fault_Manager",
+        "value": 47
+      },
+      "facts": [
+        "ss.path",
+        "ss.value"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-LARGE-CHART",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Mode_Manager/Master_FSM",
+        "name": "Master_FSM",
+        "states": 55,
+        "lim": 40
+      },
+      "facts": [
+        "c.name",
+        "c.path",
+        "c.states",
+        "policy.arch.max_chart_states"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-LARGE-SUBSYS-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Estimation/SOC_Estimator",
+        "n": 145,
+        "lim": 100
+      },
+      "facts": [
+        "policy.arch.large_subsys_blocks",
+        "ss.n_blocks",
+        "ss.path"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-MASTER-MULTIRATE",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "n": 5,
+        "lim": 4
+      },
+      "facts": [
+        "model.bms_master.solver.distinct_rates",
+        "policy.arch.max_distinct_rates"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-UNCONNECTED-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Signal_Aggregator/Decode_Fault_Flags/Logical Operator",
+        "type": "Inport",
+        "n": 2
+      },
+      "facts": [
+        "port.path",
+        "port.port",
+        "port.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-UNCONNECTED-MASTER",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_master/Protection/Contactor_Logic/Switch",
+        "type": "Outport",
+        "n": 1
+      },
+      "facts": [
+        "port.path",
+        "port.port",
+        "port.type"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "ARCH-UNCONNECTED-SLAVE",
+      "category": "model_arch",
+      "source": "model_arch.yaml",
+      "fired": true,
+      "bindings": {
+        "path": "bms_slave/Comm/RX_Decoder/Demux",
+        "type": "Outport",
+        "n": 3
+      },
+      "facts": [
+        "port.path",
+        "port.port",
+        "port.type"
+      ]
+    }
+  ]
+}

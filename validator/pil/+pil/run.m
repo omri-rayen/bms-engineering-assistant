@@ -11,6 +11,7 @@ p.addParameter('filter',    '');
 p.addParameter('verbose',   true);
 p.addParameter('outFile',   '');
 p.addParameter('testsRoot', '');
+p.addParameter('on_test',   []);
 p.parse(varargin{:});
 opt = p.Results;
 
@@ -29,8 +30,27 @@ if evalin('base', '~exist(''bms'',''var'')')
     evalin('base', sprintf('run(''%s'')', initFile));
 end
 
+% Drop any in-memory model state inherited from the MIL/SIL phases
+% (in particular CovEnable left dirty by Simulink Coverage). Reload
+% from .slx happens lazily inside pil.configure / pil.build.
+for m = {'bms_master','bms_slave','fault_predictor','system_model'}
+    if bdIsLoaded(m{1})
+        try, set_param(m{1}, 'Dirty', 'off'); catch, end %#ok<CTCH>
+        try, bdclose(m{1});                  catch, end %#ok<CTCH>
+    end
+end
+
 pil.configure(opt.mdl);
-if ~opt.skip_build
+if opt.skip_build
+    pilExe = fullfile(proj, [opt.mdl '_ert_rtw'], 'pil', [opt.mdl '.elf']);
+    if isfile(pilExe)
+        fprintf('[pil] skip_build=1 -> reusing cached PIL ELF: %s\n', pilExe);
+    else
+        fprintf('[pil] skip_build=1 requested but no cached ELF found at %s -- building anyway\n', pilExe);
+        pil.build(opt.mdl);
+    end
+else
+    fprintf('[pil] skip_build=0 -> running pil.build(%s) (rebuild + reflash)\n', opt.mdl);
     pil.build(opt.mdl);
 end
 
@@ -44,10 +64,13 @@ for f = 1:numel(files)
     end
     if opt.verbose, fprintf('  [pil] %-44s ', fn); end
     snap = val.snapshot_ws();
+    setappdata(0, 'val_last_sims', {});
     t0 = tic;
+    captured = '';
     try
-        r = feval(fn);
+        captured = evalc('r = feval(fn);');
     catch ME
+        if ~isempty(captured), fprintf(2, '%s\n', captured); end
         r = val.new_result("pil", string(fn), string(fn), "");
         r.status = "error";
         r.error  = string(ME.message);
@@ -58,6 +81,9 @@ for f = 1:numel(files)
     val.restore_ws(snap);
     if opt.verbose, fprintf('%-7s  (%.2fs)\n', upper(r.status), r.duration_s); end
     results(end+1, 1) = r; %#ok<AGROW>
+    if ~isempty(opt.on_test)
+        try, opt.on_test(struct('suite',"pil",'name',string(fn),'status',string(r.status),'duration_s',r.duration_s)); catch, end
+    end
 end
 
 report.timestamp = string(datetime('now','Format','yyyyMMdd_HHmmss'));

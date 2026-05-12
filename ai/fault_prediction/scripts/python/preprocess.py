@@ -1,11 +1,7 @@
 """Preprocess the MIL fault dataset into windowed train/val/test splits.
 
-dataset.mat (one entry per (trip, scenario) run) -> preprocessed/
-  train.npz, val.npz, test.npz   X[n,W,8] Y[n,3]  +  run_idx, trip_id
-  stats.json                     z-score mean/std from training set
-  split.json                     seed + which trip IDs went where
-
-Splitting is done by trip_id so that no trip appears in two splits.
+dataset.mat -> preprocessed/{train,val,test}.npz  +  stats.json  +  split.json
+Trip-level split (no trip appears in two sets).
 """
 
 from __future__ import annotations
@@ -25,8 +21,7 @@ OUT_DIR   = DATA_DIR / "preprocessed"
 MAT_PATH  = DATA_DIR / "dataset.mat"
 LOG_PATH  = DATA_DIR / "log.csv"
 
-W = 50    # BPTT window length [samples] (5 s at 10 Hz). Inference is
-          # stateful (1 sample/step); W only sets the training unroll depth.
+W = 50    # BPTT window [samples]; inference is stateful so W only affects training unroll
 S = 1     # stride [samples] (0.1 s = match runtime cadence, no subsampling)
 
 FEATURES = ["Vmin", "Vmax", "SoC", "Tmax", "Tcool", "Ipack", "dVmin", "dTmax"]
@@ -38,11 +33,7 @@ SPLIT_RATIOS = (0.70, 0.15, 0.15)
 
 # ---------------------------------------------------------------------------
 def load_runs():
-    """Return list of dicts: {X, Y, trip_id, scen_id, fault}.
-
-    dataset.mat carries no trip_id in meta, so we read it from log.csv
-    (written in the same order as the results array).
-    """
+    """Return list of {X, Y, trip_id, scen_id, fault} dicts from dataset.mat + log.csv."""
     print(f"Loading {MAT_PATH.name} ...")
     d = mat73.loadmat(str(MAT_PATH))["results"]
     Xs, Ys, metas = d["X"], d["Y"], d["meta"]
@@ -70,10 +61,7 @@ def load_runs():
 
 
 def split_trips(runs):
-    """Split trips 70/15/15 by trip_id, reserving one UV and one OT trip
-    each for val and test (otherwise random splits often leave a class
-    with zero positives outside train).
-    """
+    """Trip-level 70/15/15 split, guaranteeing UV and OT trips in val and test."""
     trip_ids = sorted({r["trip_id"] for r in runs})
     rng = random.Random(SEED)
 
@@ -150,11 +138,11 @@ def main():
     print("Windowing ...")
     data = {name: build_split(runs, ids) for name, ids in splits.items()}
 
-    # Z-score using training-set statistics only (no leakage).
+    # z-score from training set only (float64 accumulator avoids overflow on ~1e8 rows)
     Xtr = data["train"][0]
     flat = Xtr.reshape(-1, Xtr.shape[-1])
-    mean = flat.mean(axis=0)
-    std  = flat.std(axis=0)
+    mean = flat.mean(axis=0, dtype=np.float64).astype(np.float32)
+    std  = flat.std(axis=0,  dtype=np.float64).astype(np.float32)
     std[std < 1e-8] = 1.0   # guard against constant features
 
     print("Per-feature stats (train):")

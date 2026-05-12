@@ -32,7 +32,12 @@ fprintf('Building PIL target for %s ... ', mdl);
 t0 = tic;
 simIn = Simulink.SimulationInput(mdl);
 simIn = simIn.setModelParameter('SimulationMode', 'processor-in-the-loop');
-simIn = simIn.setModelParameter('StopTime', '0');
+simIn = simIn.setModelParameter('StopTime',       '0');
+% Belt + suspenders: cov knobs are also forced off in pil.configure but
+% the build sim is the single most likely place to trip the
+% "profiling + coverage" Embedded Coder check.
+simIn = simIn.setModelParameter('CovEnable',         'off');
+simIn = simIn.setModelParameter('CovModelRefEnable', 'off');
 buildLog = evalc('sim(simIn);');
 fprintf('done (%.1fs)\n', toc(t0));
 if any(contains(string(buildLog), ["error", "Error"]))

@@ -1,13 +1,6 @@
-"""LSTM fault predictor.
+"""LSTM fault predictor: [batch, W, features] -> [batch, n_classes] logits.
 
-Input  : [batch, W, n_features]
-Output : [batch, n_classes] raw logits (multi-label).
-
-Training uses raw logits with BCEWithLogitsLoss for numerical stability
-(see train.py).  Evaluation and export wrap the model in `ProbWrapper`
-so that the deployed network (ONNX -> Simulink) emits per-class
-probabilities in [0, 1] directly; thresholding to boolean alarms is then
-done downstream in Simulink against the values in thresholds.json.
+Use BCEWithLogitsLoss during training. Wrap with ProbWrapper for inference/export.
 """
 
 import torch
@@ -33,9 +26,7 @@ class FaultLSTM(nn.Module):
 
 
 class ProbWrapper(nn.Module):
-    """Wrap a logits-producing model with a sigmoid so the public output
-    is per-class probabilities. Used by evaluate.py and export.py; never
-    used at training time (training keeps logits + BCEWithLogitsLoss)."""
+    """Sigmoid wrapper — used for inference/export, not during training."""
 
     def __init__(self, base: nn.Module):
         super().__init__()

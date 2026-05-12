@@ -21,4 +21,5 @@ for c = 1:3
     r.metrics.(sprintf('FN_%s', classes{c})) = score(c).fn;
     r.metrics.(sprintf('FP_%s', classes{c})) = score(c).fp;
 end
+r.signals_plot = string(val.predictor_summary_plot('PRD-DR-01', score, r));
 end

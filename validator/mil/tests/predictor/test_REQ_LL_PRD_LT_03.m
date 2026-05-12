@@ -5,6 +5,7 @@ function r = test_REQ_LL_PRD_LT_03()
 r = val.new_result("predictor","PRD-LT-03","UV median alarm lead-time vs warn","REQ-LL-PRD-LT-03");
 score = val.predictor_score();
 r = local_lead_check(r, score(3), evalin('base', 'req.PRD_LT_UV_min_s'));
+r.signals_plot = string(val.predictor_summary_plot('PRD-LT-03', score, r));
 end
 
 

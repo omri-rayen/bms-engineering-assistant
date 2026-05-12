@@ -1,0 +1,445 @@
+{
+  "schema_version": "1.0",
+  "timestamp": "20260509_012314",
+  "inputs": {
+    "facts": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\analyzer\\reports\\FACTS.json",
+    "coverage": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\COV.json",
+    "mil": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\MIL.json",
+    "sil": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\SIL.json",
+    "pil": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\reports\\PIL.json",
+    "requirements": "C:\\Users\\rayen\\Desktop\\bms-engineering-assistant\\validator\\requirements\\requirements.json"
+  },
+  "summary": {
+    "n_findings": 9,
+    "by_severity": {
+      "info": 0,
+      "minor": 3,
+      "major": 1,
+      "critical": 5
+    },
+    "by_category": {
+      "dead_code": 3,
+      "validation": 6
+    },
+    "verdict": "blocking"
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "rule_id": "DC-MASTER-COND",
+      "category": "dead_code",
+      "severity": "major",
+      "finding": "bms_master condition dead = 1.08% (limit 0.0%)",
+      "reasoning": "Some Boolean operand has never toggled both ways. This usually points at one input of an AND/OR gate that is constant under the current stimulus -- often easy to fix with a targeted test.",
+      "recommend": [
+        "Locate the gates flagged by Coverage and toggle each input independently in a small dedicated MIL test."
+      ],
+      "refs": [],
+      "evidence": {
+        "facts_used": [
+          "coverage.bms_master.condition.dead_pct",
+          "policy.limits.bms_master.cond"
+        ],
+        "values": {
+          "model": "bms_master",
+          "value": 1.0791366906474877,
+          "limit": 0
+        }
+      }
+    },
+    {
+      "id": "F-002",
+      "rule_id": "DC-MASTER-DEC",
+      "category": "dead_code",
+      "severity": "critical",
+      "finding": "bms_master decision dead = 2.77% (ASIL D, limit 0.0%)",
+      "reasoning": "A branch never taken in an ASIL-D model means a logical path of the design has never been verified. Decision coverage is required at ASIL D and >= ASIL B by ISO 26262-6 table 7.",
+      "recommend": [
+        "Identify the un-toggled decisions in COV.json and add tests that drive both the true and the false branch.",
+        "If a branch is genuinely unreachable (defensive coding), add a coverage filter with a written justification."
+      ],
+      "refs": [
+        "ISO 26262-6:2018, table 7 (branch coverage at ASIL D)"
+      ],
+      "evidence": {
+        "facts_used": [
+          "coverage.bms_master.decision.dead_pct",
+          "policy.component_asil.bms_master",
+          "policy.limits.bms_master.dec"
+        ],
+        "values": {
+          "model": "bms_master",
+          "asil": "D",
+          "value": 2.772466539196941,
+          "limit": 0
+        }
+      }
+    },
+    {
+      "id": "F-003",
+      "rule_id": "DC-MASTER-MCDC",
+      "category": "dead_code",
+      "severity": "minor",
+      "finding": "bms_master MCDC dead = 90.24% (limit 0.0%)",
+      "reasoning": "MCDC requires every input of a multi-condition decision to flip the outcome on its own. On wide AND-gates (e.g. Balancing_Arbitrator's 4-input AND across 8 lanes) this is structurally hard. ISO 26262-6 \u00a79.4.5 explicitly allows accepting the gap with rationale.",
+      "recommend": [
+        "Either add MCDC-specific stimuli for each multi-input gate, or document the residual gap with a \u00a79.4.5 rationale and freeze it."
+      ],
+      "refs": [],
+      "evidence": {
+        "facts_used": [
+          "coverage.bms_master.mcdc.dead_pct",
+          "policy.limits.bms_master.mcdc"
+        ],
+        "values": {
+          "model": "bms_master",
+          "value": 90.2439024390244,
+          "limit": 0
+        }
+      }
+    },
+    {
+      "id": "F-004",
+      "rule_id": "VAL-MIL-FAIL",
+      "category": "validation",
+      "severity": "critical",
+      "finding": "MIL: 1 fail / 1 error out of 5 tests (['REQ-LL-BMS-FSM-01', 'REQ-LL-BMS-SOC-01'])",
+      "reasoning": "A failing MIL test means the model does not meet a low-level requirement against the virtual plant. Nothing downstream (SIL, PIL, coverage) is meaningful until MIL is green.",
+      "recommend": [
+        "Open the MIL report, look at the named test(s), fix the model or the test data, then re-run mil.run."
+      ],
+      "refs": [
+        "validator/reports/MIL.json"
+      ],
+      "evidence": {
+        "facts_used": [
+          "validation.mil.error",
+          "validation.mil.fail",
+          "validation.mil.failing_tests",
+          "validation.mil.passed",
+          "validation.mil.present",
+          "validation.mil.total"
+        ],
+        "values": {
+          "total": 5,
+          "passed": 3,
+          "failed": 1,
+          "errored": 1,
+          "failing": [
+            "REQ-LL-BMS-FSM-01",
+            "REQ-LL-BMS-SOC-01"
+          ]
+        }
+      }
+    },
+    {
+      "id": "F-005",
+      "rule_id": "VAL-PIL-FAIL",
+      "category": "validation",
+      "severity": "critical",
+      "finding": "PIL: 1 fail / 0 error out of 3 tests (['REQ-LL-RT-WCET-01'])",
+      "reasoning": "A PIL failure is the latest-stage signal we have: either timing, memory or numerics is off on the real MCU. Treat as blocking.",
+      "recommend": [
+        "Look at the named requirement in PIL.json -- WCET, RAM and predictor error each have a separate diagnostic path."
+      ],
+      "refs": [
+        "validator/reports/PIL.json"
+      ],
+      "evidence": {
+        "facts_used": [
+          "validation.pil.error",
+          "validation.pil.fail",
+          "validation.pil.failing_tests",
+          "validation.pil.present",
+          "validation.pil.total"
+        ],
+        "values": {
+          "total": 3,
+          "failed": 1,
+          "errored": 0,
+          "failing": [
+            "REQ-LL-RT-WCET-01"
+          ]
+        }
+      }
+    },
+    {
+      "id": "F-006",
+      "rule_id": "VAL-PIL-PRED-WARN",
+      "category": "validation",
+      "severity": "minor",
+      "finding": "PIL predictor max abs err = 0.0007 above warn line 0.0005",
+      "reasoning": "Numerics on target are drifting closer to the limit.",
+      "recommend": [
+        "Compare prob_3 traces sample-by-sample on the longest test trip."
+      ],
+      "refs": [
+        "REQ-LL-PIL-PRD-01"
+      ],
+      "evidence": {
+        "facts_used": [
+          "policy.pil.predictor_max_abs_err_max",
+          "policy.pil.predictor_max_abs_err_warn",
+          "validation.pil.predictor_max_abs_err"
+        ],
+        "values": {
+          "value": 0.0007,
+          "warn": 0.0005
+        }
+      }
+    },
+    {
+      "id": "F-007",
+      "rule_id": "VAL-PIL-RAM-WARN",
+      "category": "validation",
+      "severity": "minor",
+      "finding": "PIL RAM = 210.0 kB above warn line 200 kB (budget 256 kB)",
+      "reasoning": "RAM growth is approaching the budget.",
+      "recommend": [
+        "Audit the largest static buffers with arm-none-eabi-nm --size-sort."
+      ],
+      "refs": [
+        "REQ-LL-RT-RAM-01"
+      ],
+      "evidence": {
+        "facts_used": [
+          "policy.pil.ram_kb_max",
+          "policy.pil.ram_kb_warn",
+          "validation.pil.ram_kb"
+        ],
+        "values": {
+          "value": 210.0,
+          "warn": 200,
+          "limit": 256
+        }
+      }
+    },
+    {
+      "id": "F-008",
+      "rule_id": "VAL-PIL-WCET-OVER",
+      "category": "validation",
+      "severity": "critical",
+      "finding": "PIL WCET = 12500 us exceeds budget 10000 us",
+      "reasoning": "Per-step WCET is above the 10 % CPU-load budget at the 100 ms BMS tick. The control loop will miss its deadline on the target.",
+      "recommend": [
+        "Profile the slowest step (Embedded Coder Detailed profiling).",
+        "Move the LSTM inference to a slower derived rate, or reduce predictor sequence length."
+      ],
+      "refs": [
+        "REQ-LL-RT-WCET-01"
+      ],
+      "evidence": {
+        "facts_used": [
+          "policy.pil.wcet_us_max",
+          "validation.pil.wcet_us"
+        ],
+        "values": {
+          "value": 12500.0,
+          "limit": 10000
+        }
+      }
+    },
+    {
+      "id": "F-009",
+      "rule_id": "VAL-SIL-FAIL",
+      "category": "validation",
+      "severity": "critical",
+      "finding": "SIL: 1 fail / 0 error out of 1 tests (['REQ-LL-SIL-EQ-01'])",
+      "reasoning": "A SIL miss means the generated C-code diverges from the Simulink model by more than the equivalence tolerance. This points at a code-generation artefact (datatype, overflow, fixed-point) and MUST be resolved before PIL.",
+      "recommend": [
+        "Compare MIL vs SIL signals for the failing requirement; isolate the first divergence with validator/compare/.",
+        "Check Embedded Coder build settings: BuildConfiguration, target word size, math library, integer overflow handling."
+      ],
+      "refs": [
+        "validator/reports/SIL.json",
+        "ISO 26262-6:2018, table 9"
+      ],
+      "evidence": {
+        "facts_used": [
+          "validation.sil.error",
+          "validation.sil.fail",
+          "validation.sil.failing_tests",
+          "validation.sil.present",
+          "validation.sil.total"
+        ],
+        "values": {
+          "total": 1,
+          "failed": 1,
+          "errored": 0,
+          "failing": [
+            "REQ-LL-SIL-EQ-01"
+          ]
+        }
+      }
+    }
+  ],
+  "trace": [
+    {
+      "pass": 1,
+      "rule_id": "DC-MASTER-COND",
+      "category": "dead_code",
+      "source": "dead_code.yaml",
+      "fired": true,
+      "bindings": {
+        "model": "bms_master",
+        "value": 1.0791366906474877,
+        "limit": 0
+      },
+      "facts": [
+        "coverage.bms_master.condition.dead_pct",
+        "policy.limits.bms_master.cond"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "DC-MASTER-DEC",
+      "category": "dead_code",
+      "source": "dead_code.yaml",
+      "fired": true,
+      "bindings": {
+        "model": "bms_master",
+        "asil": "D",
+        "value": 2.772466539196941,
+        "limit": 0
+      },
+      "facts": [
+        "coverage.bms_master.decision.dead_pct",
+        "policy.component_asil.bms_master",
+        "policy.limits.bms_master.dec"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "DC-MASTER-MCDC",
+      "category": "dead_code",
+      "source": "dead_code.yaml",
+      "fired": true,
+      "bindings": {
+        "model": "bms_master",
+        "value": 90.2439024390244,
+        "limit": 0
+      },
+      "facts": [
+        "coverage.bms_master.mcdc.dead_pct",
+        "policy.limits.bms_master.mcdc"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "VAL-MIL-FAIL",
+      "category": "validation",
+      "source": "validation.yaml",
+      "fired": true,
+      "bindings": {
+        "total": 5,
+        "passed": 3,
+        "failed": 1,
+        "errored": 1,
+        "failing": [
+          "REQ-LL-BMS-FSM-01",
+          "REQ-LL-BMS-SOC-01"
+        ]
+      },
+      "facts": [
+        "validation.mil.error",
+        "validation.mil.fail",
+        "validation.mil.failing_tests",
+        "validation.mil.passed",
+        "validation.mil.present",
+        "validation.mil.total"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "VAL-PIL-FAIL",
+      "category": "validation",
+      "source": "validation.yaml",
+      "fired": true,
+      "bindings": {
+        "total": 3,
+        "failed": 1,
+        "errored": 0,
+        "failing": [
+          "REQ-LL-RT-WCET-01"
+        ]
+      },
+      "facts": [
+        "validation.pil.error",
+        "validation.pil.fail",
+        "validation.pil.failing_tests",
+        "validation.pil.present",
+        "validation.pil.total"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "VAL-PIL-PRED-WARN",
+      "category": "validation",
+      "source": "validation.yaml",
+      "fired": true,
+      "bindings": {
+        "value": 0.0007,
+        "warn": 0.0005
+      },
+      "facts": [
+        "policy.pil.predictor_max_abs_err_max",
+        "policy.pil.predictor_max_abs_err_warn",
+        "validation.pil.predictor_max_abs_err"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "VAL-PIL-RAM-WARN",
+      "category": "validation",
+      "source": "validation.yaml",
+      "fired": true,
+      "bindings": {
+        "value": 210.0,
+        "warn": 200,
+        "limit": 256
+      },
+      "facts": [
+        "policy.pil.ram_kb_max",
+        "policy.pil.ram_kb_warn",
+        "validation.pil.ram_kb"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "VAL-PIL-WCET-OVER",
+      "category": "validation",
+      "source": "validation.yaml",
+      "fired": true,
+      "bindings": {
+        "value": 12500.0,
+        "limit": 10000
+      },
+      "facts": [
+        "policy.pil.wcet_us_max",
+        "validation.pil.wcet_us"
+      ]
+    },
+    {
+      "pass": 1,
+      "rule_id": "VAL-SIL-FAIL",
+      "category": "validation",
+      "source": "validation.yaml",
+      "fired": true,
+      "bindings": {
+        "total": 1,
+        "failed": 1,
+        "errored": 0,
+        "failing": [
+          "REQ-LL-SIL-EQ-01"
+        ]
+      },
+      "facts": [
+        "validation.sil.error",
+        "validation.sil.fail",
+        "validation.sil.failing_tests",
+        "validation.sil.present",
+        "validation.sil.total"
+      ]
+    }
+  ]
+}

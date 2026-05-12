@@ -29,6 +29,15 @@ The JSON is the authoritative source consumed by the test suites.
 | REQ-LL-BMS-THM-01   | Heater on cold, chiller on hot, both off in band, mutual exclusion                         |
 | REQ-LL-BMS-PWR-01   | P_limit derate ≥ 20 % drop, both 0 W under shutdown, always non-negative                   |
 | REQ-LL-BMS-WDG-01   | Watchdog asserts severity ≥ Warn after `bms.N_watchdog_timeout` of frozen slave flags      |
+| REQ-LL-BMS-AGG-01   | Master min/max trees report correct extremum across all 96 cells & 32 temps                |
+| REQ-LL-BMS-AGG-02   | Slave MinMax + balancer cell argmax sweep across the 12 cells per module                   |
+| REQ-LL-BMS-BAL-03   | Balancing arbitrator selects different modules as spread pattern moves across pack         |
+| REQ-LL-BMS-FSM-02   | Per-slave fault propagation: each fault_flags_8 channel alone drives Warn→Derate→Shut      |
+| REQ-LL-BMS-PRD-01   | Decode_Fault_Flags walks each class (OV/UV/OT/UT) through none→warn→derate→shut            |
+| REQ-LL-BMS-PWR-02   | min(k_soc, k_temp) selector picks k_soc when low SoC, k_temp when very cold                |
+| REQ-LL-BMS-SOH-02   | dSoC ≥ 10 % triggers SoH coulomb-counting update; high-current segment updates R0 EMA       |
+| REQ-LL-BMS-THM-02   | Thermal manager hits saturation limits + crosses both relay edges across full T sweep      |
+| REQ-LL-BMS-WDG-02   | Watchdog severity scales with count of frozen slave channels (0/1/2-3/4+ → Nom/Warn/Der/Shut) |
 | REQ-LL-BMS-HWP-01   | HW protection asserts shutdown_cmd within 1 step (no debounce) on \|I\| ≥ I_SC_thresh     |
 
 ## Predictor (MIL)
@@ -54,3 +63,9 @@ The JSON is the authoritative source consumed by the test suites.
 | REQ-LL-RT-WCET-01   | bms_master on-chip max per-step time on STM32 H7A3 (280 MHz) < req.RT_WCET_max_us (10 ms = 10% CPU load), sampled by Embedded Coder code-execution profiling on free-running TIM5 (1 tick = 3.57 ns); HAL tick on TIM7, NVIC priorities prevent the PIL serial from being preempted; ELF built -O3 |
 | REQ-LL-RT-RAM-01    | bms_master PIL ELF static RAM (data+bss) on STM32 H7A3 < req.RT_RAM_max_kb, measured by arm-none-eabi-size |
 | REQ-LL-PIL-PRD-01   | LSTM `prob_3` on the target matches MIL reference within 1e-3 over a 30 s run   |
+
+## Coverage (model-level dead code)
+
+| ID                  | Statement                                                                       |
+| ------------------- | ------------------------------------------------------------------------------- |
+| REQ-LL-COV-DEAD-01  | Cumulative Simulink Execution Coverage of `bms_master` + `bms_slave` + `fault_predictor` under the BMS MIL stimulus set leaves ≤ `req.COV_dead_pct_max` (default 0 %) of design blocks unexecuted. Decision/Condition/MCDC are also reported (informational, stimulus-coverage indicators). |

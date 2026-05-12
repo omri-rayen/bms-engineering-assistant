@@ -1,23 +1,10 @@
-% import_fault_predictor.m  --  ONNX -> dlnetwork + flat weight bundle for
-% the stateful Simulink Predict block (hand-coded LSTM forward pass).
-%
-% Reads:
-%   model/fault_predictor/inference/fault_predictor.onnx
-%   ai/fault_prediction/data/preprocessed/stats.json
-%   model/fault_predictor/inference/thresholds.json
-%
-% Writes:
-%   model/fault_predictor/inference/fault_predictor.mat            (net, thresholds; reference)
-%   model/fault_predictor/inference/fault_predictor_weights.mat    (flat weights for codegen)
-%
-% The Simulink chart in fault_predictor.slx implements the LSTM forward pass
-% by hand from the flat weights, fed one sample per BMS step (stateful). This
-% gives ~36x faster WCET than calling predict() on the full dlnetwork every
-% step, with bit-equivalent output (max diff ~7e-9 in single precision).
+% import_fault_predictor.m -- ONNX -> dlnetwork + flat weights + patch slx.
+% Reads  : fault_predictor.onnx, stats.json, thresholds.json
+% Writes : fault_predictor.mat (reference net), fault_predictor_weights.mat (codegen)
 
-here     = fileparts(mfilename('fullpath'));                 % ai/fault_prediction/scripts/matlab
-aiRoot   = fileparts(fileparts(fileparts(here)));            % ai/
-projRoot = fileparts(aiRoot);                                % repo root
+here     = fileparts(mfilename('fullpath'));
+aiRoot   = fileparts(fileparts(fileparts(here)));
+projRoot = fileparts(aiRoot);
 fpInf    = fullfile(projRoot, 'model', 'fault_predictor', 'inference');
 
 onnxFn  = fullfile(fpInf, 'fault_predictor.onnx');
@@ -29,14 +16,14 @@ stFn    = fullfile(projRoot, 'ai', 'fault_prediction', 'data', 'preprocessed', '
 
 assert(isfile(onnxFn), 'Missing %s -- run export_onnx.py first.', onnxFn);
 assert(isfile(stFn),   'Missing %s -- run preprocess.py first.', stFn);
-% Always pull freshest thresholds from the training output, mirror to inference dir.
+% sync latest thresholds from training output
 if isfile(thrTrn)
     copyfile(thrTrn, thrInf);
 end
 assert(isfile(thrInf), 'Missing thresholds.json -- run train.py first.');
 thrFn = thrInf;
 
-%% Import ONNX (route auto-generated package layers into tempdir).
+%% Import ONNX
 tmpPkgDir = fullfile(tempdir, 'fp_onnx_import');
 if ~isfolder(tmpPkgDir), mkdir(tmpPkgDir); end
 oldCd = cd(tmpPkgDir);
@@ -55,14 +42,14 @@ F     = numel(stats.mean);
 mu    = single(stats.mean(:));
 sig   = single(stats.std(:));
 
-% Pull trained tensors out of the imported graph (indices match `summary(imported)`).
+% layer indices match summary(imported)
 lstm = imported.Layers(8);     % LSTMLayer
 fc1  = imported.Layers(10);    % FC (H -> 16)
 fc2  = imported.Layers(12);    % FC (16 -> C)
 H = lstm.NumHiddenUnits;
 C = numel(fc2.Bias);
 
-%% Build a clean reference dlnetwork (kept for off-line predict() / debug).
+%% Reference dlnetwork (offline predict / debug)
 layers = [
     sequenceInputLayer(F, ...
         'Name', 'window', ...
@@ -93,7 +80,7 @@ fault_predictor = net;                          %#ok<NASGU>
 save(matFn, 'fault_predictor', 'thresholds');
 fprintf('Saved %s\n', matFn);
 
-%% Flat weight bundle for the codegen-friendly stateful chart.
+%% Flat weight bundle (codegen)
 w = struct();
 w.norm_mean = mu;                                % F x 1
 w.norm_std  = sig;                               % F x 1
@@ -109,7 +96,7 @@ w.C    = int32(C);
 save(wtFn, '-struct', 'w');
 fprintf('Saved %s\n', wtFn);
 
-%% Equivalence check: hand-coded forward vs dlnetwork predict() over 50 steps.
+%% Equivalence check: hand-coded LSTM vs dlnetwork (50 steps)
 rng(42);
 xs = 0.1 * randn(F, 50, 'single');
 y_ref = single(extractdata(predict(net, dlarray(xs, 'CT'))));
@@ -135,7 +122,7 @@ fprintf('Hand-coded vs dlnetwork: dlnet=[%s] hand=[%s] max|err|=%.2e\n', ...
     sprintf('%.6f ', y_ref), sprintf('%.6f ', y_hand), err);
 assert(err < 1e-5, 'Hand-coded LSTM diverges from dlnetwork (err=%.2e).', err);
 
-%% Patch fault_predictor.slx so its inner MLFB runs the stateful forward pass.
+%% Patch fault_predictor.slx
 patch_slx(wtFn, projRoot, H);
 
 
@@ -148,9 +135,7 @@ end
 
 
 function patch_slx(wtFn, projRoot, H)
-% Make fault_predictor.slx do stateful 1-step inference from the flat
-% weight bundle. The sliding-window block becomes a passthrough (8x1)
-% because the LSTM cell state now carries the historical context.
+% Update the inner MLFB chart to run stateful 1-step inference from wtFn.
     mdl    = 'fault_predictor';
     mdlDir = fullfile(projRoot, 'model', 'fault_predictor', 'models');
     load_system(fullfile(mdlDir, mdl));
@@ -168,14 +153,12 @@ function patch_slx(wtFn, projRoot, H)
     wtStr = strrep(wtFn, '\', '\\');
     sf    = sfroot;
 
-    % Stateful predictor: 8x1 sample -> 3x1 probabilities.
     m = sf.find('-isa', 'Stateflow.EMChart', 'Path', [mdl '/Predict/Predict/MLFB']);
     assert(numel(m) == 1, 'Expected one MLFB chart at %s/Predict/Predict/MLFB.', mdl);
     m.Script = sprintf([ ...
 'function p = deepNetwork(u)\n' ...
 '%%#codegen\n' ...
-'%% Stateful LSTM forward (1 timestep/step). Bit-equivalent to the dlnetwork\n' ...
-'%% in fault_predictor.mat (max diff ~7e-9, single precision).\n' ...
+'%% Stateful LSTM forward (1 sample/step).\n' ...
 'persistent w h c\n' ...
 'if isempty(w)\n' ...
 '    w = coder.load(''%s'');\n' ...
@@ -195,18 +178,11 @@ function patch_slx(wtFn, projRoot, H)
 'p  = single(1) ./ (single(1) + exp(-y2));\n' ...
 'end'], wtStr, H, H, H, H+1, 2*H, 2*H+1, 3*H, 3*H+1, 4*H);
 
-    % Sliding-window block becomes a passthrough; LSTM state is the new memory.
-    mw = sf.find('-isa', 'Stateflow.EMChart', 'Path', [mdl '/MATLAB Function']);
-    assert(numel(mw) == 1, 'Expected one MLFB chart at %s/MATLAB Function.', mdl);
-    mw.Script = [ ...
-'function W = sliding_window(u)' newline ...
-'%#codegen' newline ...
-'%% Stateful LSTM: sample-by-sample passthrough; LSTM cell state is the memory.' newline ...
-'W = single(u(:));' newline ...
-'end'];
-
     save_system(mdl);
     drawnow;
     try, close_system(mdl, 0); catch, end
     fprintf('Patched %s.slx (stateful, 1 sample/step)\n', mdl);
 end
+
+
+
