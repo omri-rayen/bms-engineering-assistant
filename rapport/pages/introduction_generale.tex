@@ -1,0 +1,31 @@
+%% Introduction generale — 1 page
+\chapter*{Introduction générale}
+\addcontentsline{toc}{chapter}{Introduction générale}
+
+L'électrification accélérée du parc automobile mondial place le \emph{Battery
+Management System} au c\oe{}ur des défis ingénieurs des prochaines décennies.
+Valider un \bms couvre aujourd'hui des centaines d'exigences réparties
+entre le modèle de cellule, les algorithmes embarqués, la génération de
+code et les tests d'intégration. Reliés par un V-model
+rigoureux, ces activités sont encore trop souvent menées manuellement,
+avec des outils hétérogènes, sans traçabilité automatisée et sans
+capacité de synthèse intelligente.
+
+Ce projet de fin d'études propose et implémente un \textbf{outil intelligent
+d'assistance à la conception et à la validation des \bms}, fondé sur un
+V-model dual~: une branche Modèle produit et teste un \bms complet
+(\emph{plant} ECM~2RC, maître, esclaves, prédicteur LSTM) sous
+\textsc{Simulink}~; une branche Logicielle produit un pipeline
+automatisé (Validateur, Analyseur, Générateur de rapports LLM,
+Orchestrateur, Interface utilisateur). La convergence des deux branches
+constitue la démonstration finale de la valeur ajoutée de l'approche.
+
+Le rapport est structuré en cinq chapitres. Le \textbf{chapitre~1}
+pose le cadre industriel et l'état de l'art (V-model, outils de
+validation, apports de l'IA). Le \textbf{chapitre~2} analyse les
+besoins et spécifie les 86~exigences du système. Le \textbf{chapitre~3}
+décrit la branche Modèle et présente ses résultats de validation
+(MIL, SIL, PIL). Le \textbf{chapitre~4} décrit la branche Logicielle
+et ses 45~tests unitaires. Le \textbf{chapitre~5} documente
+l'intégration des deux branches et la validation d'acceptation
+complète.

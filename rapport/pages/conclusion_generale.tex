@@ -1,0 +1,29 @@
+%% Conclusion generale — 1 page
+\chapter*{Conclusion générale}
+\addcontentsline{toc}{chapter}{Conclusion générale}
+
+Le projet \emph{BMS Engineering Assistant} a atteint l'ensemble de ses
+objectifs. Deux livrables complémentaires ont été produits et intégrés~:
+un BMS \textsc{Simulink} complet (mod\`{e}le ECM~2RC, FSM de protection,
+équilibrage, pronostic LSTM) validé sur soixante-dix trajets mesurés~;
+et un pipeline logiciel automatisé qui pilote la campagne de validation,
+en analyse les résultats par un moteur de règles YAML, puis synthétise un
+rapport HTML exploité par un LLM.
+
+Les résultats clés obtenus sont les suivants~: toutes les 86~exigences
+couvrent à 100~\% après intégration~; le temps d'exécution WCET PIL
+mesuré (1000{,}6~µs) représente moins de 11~\% du budget de 10~ms~;
+le prédicteur LSTM détecte les trois types de défauts avec une latence
+inférieure à 250~ms et zéro faux-positif sur le dataset de référence~;
+la campagne complète s'exécute en moins de 15~minutes à froid, et en
+moins de 2~minutes avec les caches actifs.
+
+Trois axes principaux d'évolution se dessinent. L'extension du catalogue
+de défauts aux scénarios combinés (déséquilibre simultané à un emballement
+thermique) constitue la priorité de court terme. Le portage à une cible
+automobile certifiable (\emph{Infineon AURIX TC4xx}~/ \emph{NXP S32K3})
+permettra d'apprécier la robustesse de la chaîne \emph{Embedded Coder}
+face aux contraintes ASIL-B. Enfin, la substitution du service Groq par
+un modèle local (\textsc{vLLM}~/ \textsc{Ollama}) est immédiatement
+faisable et garantira l'indépendance vis-à-vis de tout fournisseur
+exterieur pour une mise en production à l'échelle industrielle.

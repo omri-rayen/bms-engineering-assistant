@@ -1,0 +1,99 @@
+%% ============================================================
+%% RAPPORT DE FIN D'ETUDES (PFE)
+%% Outil intelligent d'assistance a la conception et a la
+%% validation des BMS pour vehicules electriques
+%% ============================================================
+
+\documentclass[12pt,a4paper,oneside]{report}
+
+%% --- Encodage et langue ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{lmodern}
+
+%% --- Mise en page ---
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+
+%% --- Graphiques et figures ---
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{xcolor}
+
+%% --- Tableaux ---
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+
+%% --- Mathematiques ---
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{siunitx}
+
+%% --- Code ---
+\usepackage{listings}
+\usepackage{enumitem}
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  showstringspaces=false
+}
+
+%% --- Liens et bibliographie ---
+\usepackage[hidelinks]{hyperref}
+\usepackage[backend=biber,style=ieee,sorting=none]{biblatex}
+\addbibresource{bibliographie.bib}
+
+%% --- Glossaire des abreviations (manuel) ---
+\usepackage{xspace}
+\newcommand{\bms}{BMS\xspace}
+
+%% --- Tolerance mise en page ---
+\setlength{\emergencystretch}{3em}
+
+\begin{document}
+
+%% ====== Pages preliminaires ======
+\pagenumbering{roman}
+\input{pages/page_garde}      % a creer manuellement
+\input{pages/dedicace}        % optionnel
+\input{pages/remerciements}   % optionnel
+
+\tableofcontents
+\listoffigures
+\listoftables
+
+%% ====== Corps du rapport ======
+\cleardoublepage
+\pagenumbering{arabic}
+
+\input{pages/introduction_generale}    % fichier dedie, hors chapitres/
+
+\input{chapitres/chapitre_1}
+\input{chapitres/chapitre_2}
+\input{chapitres/chapitre_3}
+\input{chapitres/chapitre_4}
+\input{chapitres/chapitre_5}
+
+\input{pages/conclusion_generale}      % fichier dedie, hors chapitres/
+
+%% ====== Bibliographie ======
+\printbibliography[title={Références bibliographiques}]
+
+%% ====== Annexes ======
+\appendix
+% \input{annexes/annexe_A_code}
+% \input{annexes/annexe_B_captures_ui}
+% \input{annexes/annexe_C_simulations}
+% \input{annexes/annexe_D_dataset}
+% \input{annexes/annexe_E_rapports}
+% \input{annexes/annexe_F_lut_ecm}
+% \input{annexes/annexe_G_lstm_metriques}
+
+\end{document}

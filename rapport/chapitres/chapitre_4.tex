@@ -1,0 +1,924 @@
+%% ============================================================
+%% CHAPITRE 4 — CONCEPTION ET DEVELOPPEMENT DE LA PARTIE LOGICIELLE
+%% ============================================================
+%% Session  : 4
+%% Auteur   : [Nom etudiant]
+%% Redige le: 12 mai 2026
+%% Inspecte : orch/+orch/run.m  (sequencement des phases)
+%%            orchestrator/cli.py (CLI Python : argparse, MATLAB -batch)
+%%            doc_generator/{cli.py, consolidate.py, prompt.py, llm_client.py}
+%%            analyzer/python/analyzer/{engine.py, rules.py, facts.py,
+%%              reporter.py, cli.py}
+%%            analyzer/+ana/collect.m + analyzer/knowledge/*.yaml
+%%            validator/{+val/, mil/, sil/, pil/, cov/, plant/, +fp/}
+%%            app/bms_assistant.m (UI 5 vues : Dashboard / Validate /
+%%              Reports / Plots / Model)
+%%            tests/python/ (8 fichiers, 42 tests)
+%%            tests/matlab/ (3 fichiers)
+%% ============================================================
+
+\chapter{Conception et développement de la partie logicielle}
+\label{chap:partie_logicielle}
+
+\section{Introduction}
+\label{sec:ch4_introduction}
+
+Le chapitre~\ref{chap:partie_modele} a clos la branche Modèle du
+V-model dual en livrant un système sous test fonctionnel et validé
+unitairement~: \emph{plant} ECM~2RC, BMS \emph{master} et \emph{slave},
+prédicteur LSTM intégré au \emph{master}. Le présent chapitre déroule
+symétriquement la branche Logicielle. L'objectif n'est plus de
+modéliser la batterie ou le calculateur, mais de construire l'outil
+intelligent qui pilote, supervise et synthétise la chaîne de validation
+décrite au chapitre~3.
+
+L'enjeu est double. D'une part, automatiser une chaîne hétérogène qui
+mélange du code MATLAB de validation, du code Python d'analyse et un
+service externe d'inférence neuronale (\textbf{API Groq}) en un
+pipeline unique reproductible et instrumenté. D'autre part, exposer
+cette chaîne à un ingénieur de validation BMS sous une forme
+ergonomique et sans courbe d'apprentissage, par une interface
+graphique \textsc{MATLAB App~Designer} intégrée à l'environnement
+quotidien de l'équipe.
+
+Le chapitre suit la même structure descendante~\textit{$\to$}~ascendante
+que le précédent. Les exigences logicielles héritées du
+chapitre~\ref{chap:analyse_specification} et l'architecture modulaire
+sont d'abord posées (section~\ref{sec:ch4_exigences_archi}). Les
+quatre modules logiciels — Validateur, Analyseur, Générateur de
+rapports et Orchestrateur — sont ensuite développés en
+section~\ref{sec:ch4_modules}, suivis de l'interface graphique
+(section~\ref{sec:ch4_ui}). Le chapitre se conclut par la validation
+unitaire du logiciel (section~\ref{sec:ch4_validation_unitaire}) et
+par une transition vers la phase d'intégration et d'acceptation,
+traitée au chapitre~\ref{chap:integration_validation}.
+
+\section{Exigences et architecture logicielle}
+\label{sec:ch4_exigences_archi}
+
+\subsection{Exigences logicielles héritées}
+\label{subsec:ch4_exigences}
+
+La branche Logicielle s'attache à satisfaire les vingt-neuf
+exigences \texttt{REQ-SW-*} cataloguées au
+chapitre~\ref{chap:analyse_specification}. Elles se répartissent en
+cinq familles correspondant aux cinq composants logiciels du
+système. La table~\ref{tab:ch4_familles_req_sw} résume cette
+répartition et précise pour chaque famille le module responsable
+de la satisfaction.
+
+\begin{table}[H]
+  \centering
+  \caption{Répartition des 29~exigences logicielles
+  \texttt{REQ-SW-*} par module responsable.}
+  \label{tab:ch4_familles_req_sw}
+  \small
+  \begin{tabularx}{\textwidth}{|l|c|X|}
+    \hline
+    \textbf{Préfixe} & \textbf{N} & \textbf{Module responsable} \\
+    \hline
+    \texttt{REQ-SW-VAL-*}  & 7 & Validateur (orchestration MIL/SIL/PIL/COV) \\
+    \hline
+    \texttt{REQ-SW-ANA-*}  & 6 & Analyseur (collecte facts + moteur de règles) \\
+    \hline
+    \texttt{REQ-SW-DOC-*}  & 6 & Générateur de rapports (consolidation + LLM) \\
+    \hline
+    \texttt{REQ-SW-ORCH-*} & 5 & Orchestrateur (séquencement, CLI, callbacks) \\
+    \hline
+    \texttt{REQ-SW-UI-*}   & 5 & Interface utilisateur (App~Designer) \\
+    \hline
+    \textbf{Total}        & \textbf{29} & — \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\subsection{Architecture modulaire générale}
+\label{subsec:ch4_archi_modulaire}
+
+L'architecture logicielle adopte le \emph{principe de séparation des
+responsabilités} en isolant chaque préoccupation dans un module
+indépendant, déployable et testable séparément. La
+figure~\ref{fig:ch4_archi_modulaire} présente cette architecture en
+cinq blocs~: un \textbf{Validateur} qui exerce le système sous test
+en MIL, SIL et PIL et calcule la couverture structurelle, un
+\textbf{Analyseur} qui consomme les artefacts du Validateur et y
+applique un moteur expert pour produire un diagnostic, un
+\textbf{Générateur de rapports} qui consolide ces sorties et les
+transforme en rapport HTML lisible par l'API Groq, un
+\textbf{Orchestrateur} qui pilote les trois précédents en respectant
+leurs dépendances, et une \textbf{Interface utilisateur} qui expose
+l'ensemble à l'ingénieur de validation BMS.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{diagrams/ch4_archi_modulaire.png}
+  \caption{Architecture modulaire générale de la partie logicielle.
+  Chaque module est indépendant et testable séparément~; les flèches
+  représentent les flux de données et de contrôle.}
+  \label{fig:ch4_archi_modulaire}
+\end{figure}
+
+Cette organisation présente trois propriétés clés vis-à-vis des
+exigences. La \emph{réversibilité} du choix de service LLM est
+garantie par l'isolation de l'appel HTTP dans un client minimal
+(\texttt{doc\_generator/llm\_client.py}, 100~lignes) qui parle le
+protocole \emph{OpenAI-compatible}~: trois variables d'environnement
+(\texttt{LLM\_API\_URL}, \texttt{LLM\_MODEL}, \texttt{LLM\_API\_KEY})
+suffisent pour basculer entre Groq, WisGate, OpenAI ou
+OpenRouter sans recompiler. La \emph{traçabilité de bout en bout} est
+assurée par la transmission, à chaque étage, d'un identifiant de run
+horodaté (\texttt{ts}) qui suffixe tous les artefacts produits. La
+\emph{reproductibilité} est obtenue par l'écriture systématique d'un
+\emph{snapshot} des paramètres et des sorties dans
+\texttt{validator/reports/} et \texttt{analyzer/reports/}.
+
+\subsection{Architecture détaillée~: flux de données inter-modules}
+\label{subsec:ch4_archi_detaillee}
+
+Les modules communiquent exclusivement par fichiers JSON normalisés,
+ce qui découple totalement les langages d'implémentation et autorise
+l'inspection manuelle de tout étage intermédiaire. La
+figure~\ref{fig:ch4_flux_inter_modules} décrit les flux entre les
+fichiers d'artefacts produits ou consommés à chaque étage, avec leurs
+schémas et leurs chemins relatifs au dépôt.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{diagrams/ch4_flux_inter_modules.png}
+  \caption{Diagramme de flux inter-modules~: artefacts JSON et HTML
+  échangés entre Validateur, Analyseur, Générateur de rapports,
+  Orchestrateur et Interface utilisateur.}
+  \label{fig:ch4_flux_inter_modules}
+\end{figure}
+
+\subsection{Diagramme de classes principal}
+\label{subsec:ch4_diag_classes}
+
+Le diagramme UML de classes (figure~\ref{fig:ch4_diag_classes}) ne
+représente que les composants logiciels développés dans le cadre du
+projet, à l'exclusion des bibliothèques tierces (\textsc{torch},
+\textsc{numpy}, \texttt{urllib.request}, etc.). La hiérarchie est
+volontairement plate~: aucun héritage profond, aucune
+métaprogrammation, conformément à la règle interne du projet selon
+laquelle le code Python doit rester lisible par un ingénieur
+familier de \textsc{MATLAB} sans formation à la programmation
+orientée objet avancée.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{diagrams/ch4_diag_classes.png}
+  \caption{Diagramme UML de classes principal de la partie logicielle.
+  La classe \texttt{bms\_assistant} hérite de
+  \texttt{matlab.apps.AppBase}~; les autres composants sont des modules
+  fonctionnels Python ou des packages \textsc{MATLAB} (\texttt{+orch},
+  \texttt{+ana}, \texttt{+val}).}
+  \label{fig:ch4_diag_classes}
+\end{figure}
+
+\subsection{Diagramme de séquence~: scénario de validation complet}
+\label{subsec:ch4_diag_seq}
+
+La figure~\ref{fig:ch4_diag_seq} décrit le scénario complet d'une
+exécution de validation tel que déclenché par l'ingénieur depuis la
+vue \emph{Validate} de l'interface graphique. Ce scénario, qui
+correspond au cas d'utilisation \texttt{UC-VAL-01} défini au
+chapitre~\ref{chap:analyse_specification}, exerce successivement les
+huit phases de la chaîne~: chargement des paramètres (\texttt{init\_system.m}),
+MIL, SIL, PIL, COV, collecte des \emph{facts} (\texttt{ana.collect}),
+analyseur Python, et génération des deux rapports HTML.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.95\textwidth]{diagrams/ch4_diag_sequence.png}
+  \caption{Diagramme UML de séquence du scénario de validation
+  complet (\texttt{UC-VAL-01}). Le \emph{progress\_cb} remonte
+  l'avancement à l'UI à chaque test individuel.}
+  \label{fig:ch4_diag_seq}
+\end{figure}
+
+\section{Développement des modules logiciels}
+\label{sec:ch4_modules}
+
+\subsection{Module Validateur}
+\label{subsec:ch4_validateur}
+
+Le \textbf{Validateur} est le module qui exerce effectivement le
+système sous test du chapitre~\ref{chap:partie_modele}. Il est
+implémenté en \textsc{MATLAB} sous la forme de cinq packages~:
+\texttt{+plant} pour la convergence du \emph{plant model},
+\texttt{+mil} pour les tests \emph{Model-in-the-Loop},
+\texttt{+sil} pour les tests \emph{Software-in-the-Loop},
+\texttt{+pil} pour les tests \emph{Processor-in-the-Loop} sur la cible
+STM32H7A3, et \texttt{+cov} pour la collecte de la couverture
+structurelle. Un sixième package \texttt{+val} regroupe les
+\emph{helpers} partagés (résolution des signaux loggés, génération du
+\texttt{Simulink.SimulationData.Dataset} d'entrée du \emph{master},
+sérialisation JSON des verdicts).
+
+\paragraph{Validation de la convergence du \emph{plant model}.}
+La fonction \texttt{plant.run()} compare, sur les soixante-dix
+trajets disponibles, les sorties simulées
+(\(V_\text{pack}\), \(\mathrm{SoC}_\text{pack}\), \(T_\text{pack}\))
+aux mesures correspondantes. Les RMSE par trajet sont sérialisées
+dans \path{validator/reports/plant_convergence.json}, et les
+verdicts globaux (médiane, moyenne, max) sont calculés en regard des
+seuils \texttt{req.PLT\_*\_max\_*} chargés depuis
+\texttt{init\_system.m}. Cette fonction satisfait
+\texttt{REQ-SW-VAL-PLT-01}.
+
+\paragraph{Validation automatisée MIL / SIL / PIL.}
+Les trois fonctions \texttt{mil.run()}, \texttt{sil.run()} et
+\texttt{pil.run()} suivent le même schéma~: découverte des fichiers
+\texttt{test\_<REQ-ID>.m} dans le sous-dossier \texttt{tests/} de
+chaque package, exécution sous \emph{harness} \textsc{Simulink},
+calcul des verdicts, écriture du rapport JSON horodaté avec une copie
+\emph{sticky} non horodatée pour faciliter les comparaisons. La
+fonction \texttt{sil.run()} peut sauter la régénération du code
+(\texttt{skip\_build}) lorsque le code C n'a pas changé depuis le
+dernier \emph{run}, ce qui économise environ 30~secondes par
+exécution. La fonction \texttt{pil.run()} déclenche, si nécessaire, la
+recompilation du binaire pour la carte
+\emph{NUCLEO-H7A3ZI-Q} via la chaîne \emph{Embedded Coder} configurée
+au chapitre~\ref{chap:partie_modele}, opération qui prend
+typiquement de l'ordre d'une minute par phase. Ces trois fonctions
+satisfont collectivement
+\texttt{REQ-SW-VAL-MIL-01}, \texttt{REQ-SW-VAL-SIL-01} et
+\texttt{REQ-SW-VAL-PIL-01}.
+
+\paragraph{Analyse de la couverture et détection du code mort.}
+La couverture structurelle est calculée \emph{en ligne} avec les
+tests MIL, et non en passe séparée~: le \emph{driver} \texttt{mil.run}
+collecte un objet \texttt{cvdata} pendant son exécution, que la
+fonction \texttt{cov.from\_cvdata()} agrège ensuite par modèle
+(\emph{slave}, \emph{master}, \emph{predictor}) et par métrique
+(\emph{Execution}, \emph{Decision}, \emph{Condition}, \emph{MC/DC}).
+Cette stratégie en \emph{passe unique} évite de re-simuler la totalité
+de la suite MIL, ce qui réduit le temps total d'environ 40~\%, et
+garantit par construction que la couverture mesurée correspond
+exactement au stimulus exercé. Le verdict est binaire~: une exigence
+\texttt{REQ-LL-COV-DEAD-01} est satisfaite si et seulement si zéro
+bloc reste inatteignable au sens de la métrique \emph{Execution}, qui
+constitue le \emph{proxy} canonique de code mort au niveau modèle.
+Les autres métriques sont remontées à titre informationnel.
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{\centering\vspace{2.2cm}
+    \textit{[Capture de la sortie console de cov.run : tableau
+    récapitulatif par modèle (slave, master, predictor) avec les 4
+    métriques (exec/dec/cond/mcdc) et leur pourcentage de couverture
+    + nombre de blocs unhit, + verdict PASS]}
+    \vspace{2.2cm}}}
+  \caption{Sortie de couverture structurelle produite par
+  \texttt{cov.from\_cvdata()} pour la dernière campagne MIL.}
+  \label{fig:ch4_cov_output}
+\end{figure}
+
+\subsection{Module Analyseur}
+\label{subsec:ch4_analyseur}
+
+Le \textbf{Analyseur} est implémenté en deux parties complémentaires~:
+un \emph{collecteur de faits} \textsc{MATLAB}
+(\texttt{analyzer/+ana/}) qui extrait les métriques statiques des
+modèles \textsc{Simulink}, et un \emph{moteur expert} \textsc{Python}
+(\texttt{analyzer/python/analyzer/}) qui applique un ensemble de
+règles déclaratives à ces métriques pour produire un diagnostic
+catégorisé.
+
+\paragraph{Collecte de métriques par analyse statique.}
+La fonction \texttt{ana.collect} parcourt les modèles
+\texttt{bms\_master}, \texttt{bms\_slave} et
+\texttt{fault\_predictor} et y applique huit sondes statiques
+indépendantes~: \texttt{metrics\_static} (compte de blocs, profondeur
+hiérarchique, complexité cyclomatique), \texttt{metrics\_stateflow}
+(nombre d'états, transitions, jonctions par chart),
+\texttt{metrics\_solver} (paramètres de simulation), \texttt{metrics\_codegen}
+(état de la dernière génération de code C), \texttt{metrics\_signals}
+(signaux nommés, types, plages),
+\texttt{metrics\_rates} (taux d'échantillonnage et hiérarchie),
+\texttt{metrics\_data} (variables de modèle et bus), et
+\texttt{metrics\_codeblock} (sondes spécifiques aux blocs
+\emph{MATLAB Function} et \emph{Simulink Function}). Le résultat est
+sérialisé en \texttt{analyzer/reports/FACTS\_<timestamp>.json} avec
+un schéma versionné (\texttt{schema\_version: "1.0"}) qui isole le
+moteur expert des évolutions futures du collecteur. Cette fonction
+satisfait \texttt{REQ-SW-ANA-FACTS-01}.
+
+\paragraph{Système expert~: règles d'inférence en YAML.}
+Le moteur expert applique une logique de
+\emph{forward chaining}~\cite{Forsberg1991} sur une base de règles
+déclaratives au format YAML, stockées sous
+\texttt{analyzer/knowledge/}. Chaque règle décrit une condition
+(\texttt{when}), un ensemble de \emph{bindings} (\texttt{bind}), une
+sévérité (\texttt{severity} \(\in\) \{info, minor, major, critical\}),
+un message à émettre (\texttt{finding}), un raisonnement
+(\texttt{reasoning}), une liste de recommandations
+(\texttt{recommend}) et des références normatives (\texttt{refs}). Le
+moteur (\texttt{engine.py}) charge ces règles, les pré-compile en AST
+Python par \texttt{ast.parse}, puis les évalue dans un interprète
+restreint qui n'autorise que les opérations de comparaison,
+combinaison logique et résolution de chemins pointés sur la base de
+faits. Toute valeur manquante évalue à \emph{faux}~: la règle ne
+déclenche simplement pas, sans erreur. Cette discipline garantit
+qu'un fichier de \emph{facts} incomplet (par exemple lorsqu'un module
+n'a pas été collecté) ne fait pas échouer l'analyse mais réduit
+silencieusement son périmètre. La conception satisfait
+\texttt{REQ-SW-ANA-RULES-01}.
+
+\paragraph{Politique ASIL~: \texttt{asil\_policy.yaml}.}
+Une règle de modélisation interne au projet stipule que les seuils
+chiffrés (par exemple \emph{\og{}le nombre de blocs morts ne doit pas
+dépasser X~\%\fg}) ne doivent jamais être codés en dur dans les
+règles, mais centralisés dans un unique fichier
+\texttt{asil\_policy.yaml}. Ce fichier traduit le contexte ASIL D du
+projet en seuils numériques par modèle et par métrique, et constitue
+le seul point de réglage si l'on souhaite resserrer ou relâcher les
+exigences pour une variante du système. La conformité au standard est
+garantie par les références \texttt{refs} attachées à chaque règle,
+qui citent explicitement la clause d'ISO~26262-6:2018
+correspondante~\cite{ISO26262_6_2018} (par exemple Table~12 pour les
+métriques de couverture structurelle). Conformément à une décision
+prise dès l'analyse, ISO~26262-8 (qualification des outils) n'est
+\emph{jamais} citée pour des sujets de style de modélisation~: cette
+norme est réservée à la qualification éventuelle de l'outil lui-même.
+
+\paragraph{\emph{Downrank} des sous-systèmes en cours de développement.}
+Le moteur dispose d'une logique dite \emph{WIP downrank}~: lorsqu'un
+\emph{finding} concerne un bloc dont le chemin tombe dans la liste
+\texttt{policy.wip\_paths}, sa sévérité est rétrogradée à \emph{info}
+et le \emph{finding} est marqué d'un drapeau \texttt{wip:~true}. Cela
+permet de ne pas voir le tableau de bord saturé d'avertissements sur
+des sous-systèmes encore en cours de développement, tout en
+préservant la traçabilité complète de l'analyse. Le \emph{locator}
+\textsc{MATLAB} (\texttt{hilite\_system('chemin/du/bloc')})
+généré pour chaque \emph{finding} non trivial permet à l'ingénieur
+de sauter directement au bloc fautif depuis le rapport.
+
+\paragraph{Génération du rapport d'analyse.}
+Le \texttt{reporter.py} sérialise le résultat en
+\path{analyzer/reports/ANALYSIS_<timestamp>.json} avec, en
+parallèle, une copie sticky \texttt{ANALYSIS.json} pour faciliter les
+comparaisons entre exécutions consécutives. Un \emph{digest} textuel
+est imprimé sur la sortie standard, regroupé par sévérité décroissante
+(\emph{critical} d'abord), avec le \emph{locator} et la première
+recommandation pour chaque \emph{finding}. Cette présentation
+condensée permet à l'ingénieur d'agir immédiatement sans ouvrir le
+fichier JSON complet.
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{\centering\vspace{2.2cm}
+    \textit{[Exemple de digest console de l'analyseur : section
+    CRITICAL avec 1 finding (DC-MASTER-EXEC : execution dead = X.YY\%
+    > limit Z\%), section MAJOR vide, section MINOR avec 2-3 findings,
+    INFO avec WIP tag visible. Verdict global PASS/FAIL final.]}
+    \vspace{2.2cm}}}
+  \caption{Exemple de \emph{digest} produit par l'analyseur~: regroupement
+  par sévérité décroissante, \emph{locator} \textsc{MATLAB} et première
+  recommandation par \emph{finding}.}
+  \label{fig:ch4_analyzer_digest}
+\end{figure}
+
+\subsection{Module Générateur de rapports}
+\label{subsec:ch4_doc_generator}
+
+Le \textbf{Générateur de rapports} (\texttt{doc\_generator/}) est le
+module qui transforme les artefacts JSON techniques produits par les
+deux modules précédents en un document de synthèse lisible par un
+ingénieur ou un manager. Il s'organise en quatre étapes qui
+correspondent à autant de fichiers~: \texttt{consolidate.py}
+(consolidation), \texttt{prompt.py} (composition du prompt LLM),
+\texttt{llm\_client.py} (client HTTP minimal) et \texttt{cli.py}
+(orchestration de l'ensemble).
+
+\paragraph{Consolidation des résultats.}
+Le \texttt{consolidate.py} construit deux artefacts à partir des
+quatre rapports \texttt{MIL.json}, \texttt{SIL.json}, \texttt{PIL.json}
+et \texttt{ANALYSIS.json}~: un \texttt{FULL\_REPORT.json} qui
+concatène les quatre sources \emph{sans aucune modification} sous des
+clés stables, et un \texttt{slim} dérivé qui sert d'entrée au LLM. Le
+\texttt{FULL\_REPORT.json} est conservé tel quel parce qu'il est
+référencé par \emph{JSON Pointer} (RFC~6901) depuis le rapport HTML
+final~: chaque assertion du rapport HTML pointe ainsi vers la ligne
+exacte du fichier brut qui la justifie, ce qui rend le rapport
+auditable bloc par bloc. Cette propriété d'auditabilité satisfait
+\texttt{REQ-SW-DOC-AUDIT-01}.
+
+\paragraph{Génération du rapport résumé en deux parties.}
+Le rapport HTML est produit en \emph{deux} fichiers distincts plutôt
+qu'en un seul, pour une raison purement opérationnelle~: le quota
+\emph{Token-Per-Minute} (TPM) du palier gratuit de l'\textbf{API Groq}
+plafonne à 8000~\emph{tokens} par appel sur le modèle
+\texttt{openai/gpt-oss-120b} (\emph{prompt}~+~\emph{max\_completion}
+confondus). En scindant le rapport en deux appels — Partie~1
+(\og{}Validation Data\fg) et Partie~2 (\og{}Engineering Analysis\fg) —
+chaque appel dispose de son propre budget, ce qui multiplie par deux
+la marge utilisable. Le \texttt{slim} consommé par chaque appel est
+construit par les fonctions \texttt{slim\_for\_part1} et
+\texttt{slim\_for\_part2} qui ne retiennent que les champs strictement
+nécessaires à la section ciblée, et qui marquent chaque ligne avec son
+JSON Pointer dans le \texttt{FULL\_REPORT.json}. Une étape finale
+de \emph{trim} progressif (\texttt{\_trim\_part1},
+\texttt{\_trim\_part2}) garantit que la somme \emph{prompt}~+~\emph{max\_completion}
+reste sous le budget cible \texttt{TPM\_BUDGET} = 7600~\emph{tokens},
+qui laisse environ 5~\% de marge sur le plafond TPM réel.
+
+\paragraph{Client LLM minimal et portable.}
+Le \texttt{llm\_client.py} (\texttt{$<$~100 lignes}) parle le
+protocole \emph{OpenAI-compatible} via la \emph{stdlib} Python
+exclusivement (\texttt{urllib.request} + \texttt{json}), ce qui évite
+toute dépendance à \texttt{openai-python} ou à \texttt{requests} et
+réduit la surface d'attaque comme l'empreinte d'installation. Le
+choix du fournisseur (Groq, WisGate, OpenAI, OpenRouter) est piloté
+par les variables d'environnement \texttt{LLM\_API\_URL},
+\texttt{LLM\_MODEL} et \texttt{LLM\_API\_KEY}~; aucune logique
+fournisseur-spécifique n'apparaît dans le code. Trois précautions
+opérationnelles sont implémentées explicitement~: l'envoi d'un
+\texttt{User-Agent} explicite (sans quoi le proxy Cloudflare devant
+\texttt{api.groq.com} renvoie un HTTP~403), l'envoi simultané des
+deux clés \texttt{max\_tokens} et \texttt{max\_completion\_tokens}
+(pour rester compatible avec OpenAI \emph{strict}), et le passage
+\texttt{reasoning\_effort: "low"} qui plafonne les \emph{tokens} de
+raisonnement cachés du modèle \texttt{gpt-oss-120b} à environ 100,
+contre 1200 par défaut. Une logique de \emph{retry} unique sur erreur
+HTTP transitoire (429, 500, 502, 503, 504) couvre l'attente d'environ
+60~secondes nécessaire pour que la fenêtre glissante TPM se libère.
+
+\paragraph{Audit des références.}
+Une étape de post-traitement (\texttt{\_audit\_refs}) extrait du HTML
+généré tous les \texttt{<code>/...</code>}, les résout dans le
+\texttt{FULL\_REPORT.json} via le résolveur RFC~6901 maison, et liste
+les pointeurs cassés. Cette étape protège contre les hallucinations
+du modèle qui inventerait un chemin JSON inexistant~: tout pointeur
+non résolu est signalé et bloque, le cas échéant, la publication du
+rapport.
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{\centering\vspace{2.2cm}
+    \textit{[Capture d'un extrait du rapport HTML généré : section
+    SUMMARY avec table KPI (tests total, passed, failed, MIL/SIL/PIL
+    pass-rate, suites run), section MIL avec table req\_id|name|
+    status|reference où chaque ref est un <code>/...</code> cliquable
+    pointant vers FULL\_REPORT.json. Style sans-serif noir/blanc.]}
+    \vspace{2.2cm}}}
+  \caption{Extrait du rapport HTML produit par le Générateur~: chaque
+  référence \texttt{<code>} est un pointeur RFC~6901 vers le
+  \texttt{FULL\_REPORT.json} consolidé.}
+  \label{fig:ch4_doc_html}
+\end{figure}
+
+\subsection{Module Orchestrateur}
+\label{subsec:ch4_orchestrateur}
+
+L'\textbf{Orchestrateur} est le module qui coordonne les trois
+modules précédents et qui sert d'intermédiaire entre l'interface
+utilisateur \textsc{MATLAB} et la chaîne d'exécution. Il est
+implémenté \emph{deux fois}~: une version \textsc{MATLAB}
+(\texttt{orch/+orch/run.m}) consommée par l'interface graphique et
+optimisée pour la transmission temps réel des callbacks de
+progression, et une version \textsc{Python} (\texttt{orchestrator/cli.py})
+consommée en mode \emph{batch} pour l'intégration dans les pipelines
+CI/CD. Cette double implémentation répond à des contraintes
+d'environnement~: l'UI ne peut pas appeler \texttt{matlab -batch} en
+sous-processus depuis elle-même, et le pipeline CI ne dispose pas
+toujours d'une session \textsc{MATLAB} interactive.
+
+\paragraph{Coordination et séquencement des phases.}
+La fonction \texttt{orch.run} construit un plan d'exécution
+(\texttt{local\_plan}) sous forme de liste ordonnée de phases, dont
+chacune est un \texttt{struct} contenant un nom (\texttt{name}), un
+pointeur de fonction (\texttt{fcn}), un poids relatif
+(\texttt{weight}) servant à pondérer la barre de progression, et un
+nombre de tests prévus (\texttt{test\_count}). Les poids ne sont pas
+arbitraires~: ils reflètent la durée empirique relative observée sur
+plusieurs campagnes (un test PIL coûte typiquement 15~unités, un
+test MIL 4~unités, le \emph{build} SIL 30~unités, le \emph{build}
+PIL 60~unités). Cette pondération permet à la barre de progression
+de l'UI de progresser linéairement en temps réel, sans à-coups, ce
+qui est crucial pour la perception qu'a l'utilisateur de la
+\emph{réactivité} de l'outil.
+
+\paragraph{Gestion des flux et des données d'entrée.}
+Chaque phase reçoit en entrée le \texttt{struct opt} consolidé par
+l'\texttt{inputParser} (filtres MIL/SIL/PIL, \emph{flags}
+\texttt{skip\_*}, callbacks de \emph{logging} et de progression),
+le chemin racine du dépôt et deux callbacks~: \texttt{log\_cb} pour
+la sortie console et \texttt{progress\_cb} pour la mise à jour de
+la barre. Les phases produisent un \texttt{struct rep} qui est
+agrégé dans le résultat final \texttt{out.paths.<phase>}. Cette
+uniformité d'interface entre les six phases permet à
+\texttt{orch.run} de les enchaîner sans connaître leur sémantique
+interne.
+
+\paragraph{Gestion des états et des erreurs.}
+La machine à états de l'orchestrateur est volontairement simple~:
+chaque phase échoue indépendamment et la première erreur arrête le
+pipeline en remontant à l'UI le nom de la phase fautive
+(\texttt{out.failed\_phase}) et le message
+(\texttt{out.error}). Aucun \emph{rollback} automatique n'est tenté~:
+les artefacts produits par les phases déjà terminées sont conservés
+sur disque, ce qui permet à l'ingénieur de les inspecter ou de
+relancer manuellement les phases ratées en passant
+\texttt{skip\_<phase>} à la prochaine invocation. Cette philosophie
+\emph{fail-fast~+~conserve} a été préférée à un mécanisme de
+transactions plus complexe parce qu'elle correspond mieux aux
+habitudes des ingénieurs de validation, qui préfèrent re-jouer une
+phase isolée que reprendre la totalité du pipeline.
+
+\paragraph{Communication avec l'interface utilisateur.}
+La communication entre l'UI et l'orchestrateur s'effectue par
+\emph{callbacks} synchrones plutôt que par \emph{events}
+asynchrones~: la fonction \texttt{orch.run} appelle directement
+\texttt{progress\_cb(name, fraction)} et
+\texttt{log\_cb(message)} à chaque transition d'intérêt, et
+l'UI met à jour ses \emph{phase chips} et son log dans le même
+\emph{tick} de la boucle d'événements \textsc{MATLAB}. Ce choix simplifie
+considérablement la gestion des erreurs (pas de file d'événements
+à drainer en cas d'exception) au prix d'un couplage modéré entre
+l'UI et l'orchestrateur, jugé acceptable compte tenu du fait que les
+deux composants vivent dans le même processus.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.85\textwidth]{diagrams/ch4_diag_etat_orch.png}
+  \caption{Diagramme UML d'états de l'Orchestrateur. Chaque phase
+  \emph{Running} émet à intervalle régulier un événement
+  \texttt{progress\_cb} consommé par la barre de progression de l'UI.}
+  \label{fig:ch4_diag_etat_orch}
+\end{figure}
+
+\section[Développement de l'interface graphique]{Développement de l'interface graphique (\textsc{MATLAB App~Designer})}
+\label{sec:ch4_ui}
+
+\subsection{Choix technologique et contraintes}
+\label{subsec:ch4_choix_techno_ui}
+
+L'interface graphique est développée en \textsc{MATLAB
+App~Designer}, choix dicté par trois contraintes~: l'absence de
+nouvelle dépendance pour l'utilisateur final (App~Designer est
+fourni avec toute installation \textsc{MATLAB}), la possibilité
+d'appeler directement les fonctions du package \texttt{+orch} sans
+bridge inter-processus, et l'intégration native avec
+\textsc{Simulink} pour la fonction d'inspection des modèles
+\emph{plant} et SUT. Le revers de la médaille est l'expressivité
+limitée de la grille \texttt{uigridlayout} comparée à un framework
+\emph{web} moderne, qui impose une discipline de mise en page plus
+stricte. Le choix a néanmoins été retenu parce que l'utilisateur cible
+est l'ingénieur de validation BMS, qui passe déjà l'essentiel de sa
+journée dans \textsc{MATLAB}.
+
+L'application est implémentée comme une classe unique
+\texttt{bms\_assistant} qui hérite de \texttt{matlab.apps.AppBase}.
+Elle expose une seule méthode publique constructrice
+(\texttt{bms\_assistant()}) et organise sa logique en méthodes
+privées thématiques. Le thème graphique est volontairement clair et
+sobre~: fond \texttt{[0,96~~0,97~~0,98]}, sidebar foncée
+\texttt{[0,18~~0,22~~0,28]}, accents bleus \textsc{MATLAB}
+\texttt{[0,00~~0,45~~0,74]} pour les actions primaires et orange
+\texttt{[0,85~~0,33~~0,10]} pour les actions secondaires.
+
+\subsection{Vue Dashboard}
+\label{subsec:ch4_dashboard}
+
+La vue \emph{Dashboard} est l'écran d'accueil. Elle affiche trois
+informations~: le statut courant de l'outil (\emph{Ready}, \emph{Running},
+\emph{OK}, \emph{Failed} ou \emph{Cancelled}), l'horodatage de la
+dernière exécution, et le nombre de rapports archivés sur disque.
+Elle propose en parallèle deux actions rapides~: lancer directement
+une exécution avec les paramètres par défaut, et naviguer vers la
+vue \emph{Reports} pour consulter les exécutions passées.
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{\centering\vspace{2.2cm}
+    \textit{[Capture vue Dashboard : sidebar à gauche avec 5 boutons
+    nav (Dashboard surligné), zone principale avec 3 KPI cards (Status:
+    Ready, Last run: 2026-05-11 04:05, Reports: 12 available) et 2
+    boutons d'action rapide (Run validation, View reports)]}
+    \vspace{2.2cm}}}
+  \caption{Vue \emph{Dashboard} de l'application \texttt{bms\_assistant}.}
+  \label{fig:ch4_ui_dashboard}
+\end{figure}
+
+\subsection{Vue Validate}
+\label{subsec:ch4_validate}
+
+La vue \emph{Validate} est le cœur opérationnel de l'application.
+Elle expose les contrôles de configuration de la chaîne~: trois cases
+à cocher pour activer ou désactiver MIL, SIL et PIL~; un bouton
+permettant d'ouvrir une boîte de dialogue de sélection multiple des
+scénarios MIL (\emph{checklist popup})~; deux listes déroulantes pour
+sélectionner le scénario unique de SIL et de PIL~; et une case
+\emph{Skip build} pour économiser le temps de génération de code C
+lorsqu'aucune modification du SUT n'a eu lieu depuis le dernier
+\emph{run}. Le bouton \emph{Run} déclenche
+\texttt{orch.run} et active la barre de progression et les
+\emph{phase chips}, qui changent de couleur (gris/bleu/vert) à
+mesure que les phases s'exécutent. La console de \emph{logging} est
+masquée par défaut et activée par un bouton \emph{Show log}, choix
+ergonomique qui réduit l'encombrement visuel pendant les exécutions
+\og{}sans incident\fg{}.
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.9\textwidth}{\centering\vspace{2.5cm}
+    \textit{[Capture vue Validate : sidebar surlignée sur Validate, en
+    haut zone de configuration (3 checks MIL/SIL/PIL, scénarios MIL
+    multi-sélection, dropdowns SIL et PIL, skip\_build), bouton Run
+    central, barre de progression avec 6 chips colorées (mil/cov/sil/
+    pil/facts/analyzer/doc), console toggle en bas, console déployée
+    avec quelques lignes de log]}
+    \vspace{2.5cm}}}
+  \caption{Vue \emph{Validate} avec console déployée pendant une
+  exécution MIL~+~SIL~+~PIL.}
+  \label{fig:ch4_ui_validate}
+\end{figure}
+
+\subsection{Vue Reports}
+\label{subsec:ch4_reports}
+
+La vue \emph{Reports} liste les rapports HTML archivés sous
+\texttt{doc\_generator/reports/} dans une table triable, et propose
+quatre actions~: ouvrir un rapport dans le navigateur par défaut
+(\emph{Open HTML}), exporter le \texttt{FULL\_REPORT.json}
+correspondant (\emph{Save JSON}), exporter le rapport HTML lui-même
+(\emph{Save HTML}), et supprimer un rapport (\emph{Delete}).
+L'opération de suppression demande une confirmation et n'est jamais
+silencieuse, conformément aux principes d'opérations destructrices
+réversibles décrits au chapitre~\ref{chap:analyse_specification}.
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{\centering\vspace{2.2cm}
+    \textit{[Capture vue Reports : table avec colonnes timestamp,
+    HTML file, JSON file, status, ligne sélectionnée surlignée, à
+    droite barre d'actions verticale (Refresh, Open HTML, Save JSON,
+    Save HTML, Delete avec icône poubelle rouge)]}
+    \vspace{2.2cm}}}
+  \caption{Vue \emph{Reports}~: consultation et gestion des rapports
+  HTML archivés.}
+  \label{fig:ch4_ui_reports}
+\end{figure}
+
+\subsection{Vue Plots}
+\label{subsec:ch4_plots}
+
+La vue \emph{Plots} affiche les figures PNG produites pendant la
+dernière exécution de validation. Elle est articulée autour d'un
+sélecteur de \emph{suite} (\emph{plant}, \emph{mil/bms},
+\emph{mil/predictor}, \emph{sil}, \emph{pil}) et d'une liste des
+fichiers PNG disponibles dans le sous-dossier correspondant de
+\texttt{validator/reports/plots/}. La sélection d'un fichier dans la
+liste affiche le PNG correspondant en taille réelle dans le panneau
+principal, ce qui permet à l'ingénieur de revoir visuellement
+n'importe quel test sans quitter l'application.
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{\centering\vspace{2.2cm}
+    \textit{[Capture vue Plots : sélecteur suite en haut, liste de
+    PNG à gauche (PRD-DR-01.png surlignée), aperçu plein cadre du PNG
+    sélectionné à droite (graphique signal MIL avec courbes simulation
+    vs mesure)]}
+    \vspace{2.2cm}}}
+  \caption{Vue \emph{Plots}~: visualisation des figures PNG produites
+  par les tests de validation.}
+  \label{fig:ch4_ui_plots}
+\end{figure}
+
+\subsection{Vue Model}
+\label{subsec:ch4_model}
+
+La vue \emph{Model} expose les opérations sur les modèles
+\textsc{Simulink} du SUT~: ouverture en édition pour le \emph{master},
+le \emph{slave} et le \emph{predictor}, sauvegarde de la
+configuration PIL au format \texttt{.c} pour archivage hors session
+\textsc{MATLAB}, et réinitialisation du SUT à son état nominal par
+restauration depuis \emph{snapshot}. Le mécanisme de \emph{snapshot}
+est crucial~: à la première édition d'un modèle, une copie
+\texttt{.bak} du fichier \texttt{.slx} est automatiquement créée
+sous \texttt{model/.snapshots/}, ce qui garantit que l'utilisateur
+peut toujours revenir à l'état initial après une session
+exploratoire. La fonction \emph{Reset} parcourt l'ensemble des
+\texttt{.bak} et restaure les fichiers correspondants après
+confirmation explicite de l'utilisateur, conformément à la doctrine
+opérationnelle de l'outil.
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{\centering\vspace{2.2cm}
+    \textit{[Capture vue Model : 5 boutons d'action verticaux (Edit
+    master, Edit slave, Edit predictor, Save PIL .c, Reset to
+    snapshot), zone de texte à droite listant l'état des modèles
+    (OK / MISSING) et des snapshots]}
+    \vspace{2.2cm}}}
+  \caption{Vue \emph{Model}~: inspection, modification et restauration
+  par \emph{snapshot} des modèles \textsc{Simulink}.}
+  \label{fig:ch4_ui_model}
+\end{figure}
+
+\section{Validation unitaire du logiciel}
+\label{sec:ch4_validation_unitaire}
+
+\subsection{Stratégie de test et couverture visée}
+\label{subsec:ch4_strategie_test}
+
+La validation du logiciel suit la même règle d'or que celle du
+modèle~: une exigence, un test. Les tests Python sont écrits avec
+\texttt{pytest} et stockés sous \texttt{tests/python/}~; les tests
+\textsc{MATLAB} sont écrits avec \texttt{matlab.unittest} et stockés
+sous \texttt{tests/matlab/}. La cible de couverture est de 100~\%
+sur les modules \texttt{doc\_generator} et \texttt{analyzer/python},
+qui constituent le cœur métier du logiciel. Pour les modules à fort
+couplage avec l'environnement (\texttt{orchestrator/cli.py} qui
+appelle \texttt{matlab -batch}, \texttt{llm\_client.py} qui appelle
+le réseau), la cible est ajustée à \emph{100~\% des chemins testables
+sans dépendance externe}~: les appels HTTP et les sous-processus
+\textsc{MATLAB} sont mockés (\texttt{monkeypatch} pour \texttt{pytest})
+plutôt que réellement exercés.
+
+\subsection{Tests unitaires — Module Validateur}
+\label{subsec:ch4_tests_validateur}
+
+Les tests \textsc{MATLAB} unitaires du Validateur sont stockés sous
+\texttt{tests/matlab/}. Ils couvrent trois fichiers~:
+\texttt{test\_orch\_list\_reports.m} qui valide l'énumération et le
+tri des rapports archivés, \texttt{test\_orch\_scenarios.m} qui
+vérifie la cohérence du catalogue de scénarios MIL/SIL/PIL exposé à
+l'UI, et \texttt{test\_val\_new\_result\_check.m} qui couvre la
+fabrique de résultats de tests (\texttt{val.new\_result} et
+\texttt{val.check}). Les tests fonctionnels du Validateur sont, eux,
+les tests MIL/SIL/PIL eux-mêmes décrits au chapitre~\ref{chap:partie_modele}~:
+ils servent à la fois de validation du SUT et de validation du
+Validateur dans la même exécution. Cette dualité est rendue possible
+par le fait que le \emph{harness} \textsc{Simulink} et la sérialisation
+JSON du verdict sont des composants logiciels indépendants du SUT.
+
+\subsection{Tests unitaires — Module Analyseur}
+\label{subsec:ch4_tests_analyseur}
+
+Les tests \texttt{pytest} du module Analyseur se répartissent en
+trois fichiers (\texttt{test\_facts.py}, \texttt{test\_rules.py},
+\texttt{test\_engine.py}) et couvrent quatorze cas indépendants. Les
+tests de \texttt{facts.py} valident l'assemblage du contexte de
+travail à partir de fichiers JSON synthétiques, la résolution des
+chemins pointés (présents et absents), et l'indexation des exigences
+par identifiant. Les tests de \texttt{rules.py} valident le parsing
+YAML, le rejet des règles malformées (identifiant manquant, premise
+manquante), l'évaluation correcte d'une premise satisfaite et le
+court-circuit silencieux d'une premise référençant un fait absent.
+Les tests de \texttt{engine.py} couvrent les invariants
+fonctionnels du moteur~: une règle ne déclenche qu'une fois par
+exécution, l'expansion d'un \emph{forEach} produit un \emph{finding}
+par binding, la logique de \emph{WIP downrank} rétrograde
+correctement la sévérité, le \emph{locator} \texttt{hilite\_system}
+est généré pour tout chemin contenant un \texttt{/}, et la sélection
+de la pire sévérité dans \texttt{summarize} renvoie le rang attendu.
+
+\subsection{Tests unitaires — Module Générateur de rapports}
+\label{subsec:ch4_tests_doc_generator}
+
+\begin{sloppypar}
+Les tests du Générateur de rapports se répartissent en quatre
+fichiers (\texttt{test\_consolidate.py}, \texttt{test\_prompt.py},
+\texttt{test\_llm\_client.py}, \texttt{test\_cli\_doc.py}) et
+couvrent vingt-deux cas indépendants. Les tests de
+\texttt{consolidate.py} valident la forme du \emph{stub} de
+validateur vide, le passage à l'identique des entrées dans le
+\emph{full report}, le marquage des suites \emph{not\_run}, le calcul
+correct des KPI à partir des suites présentes, l'élision de la
+section \emph{analysis} dans le \emph{slim part 1}, et la
+préservation de l'analyse dans le \emph{slim part 2}. Les tests de
+\texttt{prompt.py} valident la présence des six identifiants de
+section dans le \emph{prompt} de la Partie~1, des trois identifiants
+dans le \emph{prompt} de la Partie~2, l'imposition du tag littéral
+\texttt{<section>}, la rétro-compatibilité des alias, et la présence
+du \emph{placeholder} \texttt{\{payload\}}. Les tests de
+\texttt{llm\_client.py} valident l'envoi du \texttt{User-Agent}
+explicite (cf. la note empirique sur le rejet Cloudflare), l'envoi
+simultané des deux clés de \emph{tokens}, et le mécanisme de
+\emph{retry} sur erreur 429. Les tests de \texttt{cli.py} (sept cas)
+valident le \emph{trim} progressif sous budget, l'audit des
+références JSON Pointer, le retrait des fences markdown, et la
+distinction entre pointeurs et noms de fichiers.
+\end{sloppypar}
+
+\subsection{Tests fonctionnels — Orchestrateur}
+\label{subsec:ch4_tests_orchestrateur}
+
+Les tests Python de l'Orchestrateur (\texttt{test\_orchestrator.py})
+sont au nombre de six et couvrent le contrat de l'\texttt{argparse}
+exposé par \texttt{orchestrator/cli.py} ainsi que la composition
+correcte du script \textsc{MATLAB} consommé par \texttt{matlab
+-batch}. Les tests d'inclusion vérifient que les commandes
+\texttt{mil.run}, \texttt{sil.run}, \texttt{pil.run},
+\texttt{cov.run} et \texttt{ana.collect} apparaissent
+\emph{sélectivement} dans le script en fonction des \emph{flags}
+fournis, et que l'option \texttt{skip\_build} est correctement
+propagée. Aucun sous-processus \texttt{matlab} réel n'est lancé~:
+ces tests exercent uniquement la logique de composition.
+
+\subsection{Tests de l'interface utilisateur}
+\label{subsec:ch4_tests_ui}
+
+L'interface utilisateur étant tributaire d'un display \textsc{MATLAB}
+interactif, sa validation automatisée est limitée à l'interface
+\emph{logique} entre l'UI et l'orchestrateur~: la vérification que la
+liste de scénarios exposée par \texttt{orch.scenarios} est cohérente
+avec celle attendue par \texttt{orch.run} (test
+\texttt{test\_orch\_scenarios.m}), et que la fonction
+\texttt{orch.list\_reports} renvoie une structure consommable par la
+table \texttt{ReportsTable} (test \texttt{test\_orch\_list\_reports.m}).
+La validation visuelle de l'UI fait l'objet d'une procédure
+manuelle documentée dans
+\texttt{tests/matlab/README.md} et exercée à chaque livraison~:
+parcours des cinq vues, lancement d'une exécution complète,
+vérification de la mise à jour des \emph{phase chips} et de la barre
+de progression. Cette validation manuelle est consignée dans le
+chapitre~\ref{chap:integration_validation} comme partie de la
+recette d'intégration.
+
+\subsection{Synthèse et taux de couverture atteint}
+\label{subsec:ch4_synthese_tests}
+
+La table~\ref{tab:ch4_synthese_tests} synthétise l'effort de test
+et les taux de réussite de la dernière campagne consolidée.
+
+\begin{table}[H]
+  \centering
+  \caption{Synthèse des tests unitaires du logiciel et de leurs
+  résultats sur la dernière campagne (mai~2026).}
+  \label{tab:ch4_synthese_tests}
+  \small
+  \begin{tabularx}{\textwidth}{|l|X|c|c|}
+    \hline
+    \textbf{Module}            & \textbf{Fichiers de test} & \textbf{Cas} & \textbf{Réussite} \\
+    \hline
+    Validateur (MATLAB)        & \texttt{test\_orch\_list\_reports.m},
+                                 \texttt{test\_orch\_scenarios.m},
+                                 \texttt{test\_val\_new\_result\_check.m} & 3 & 3 / 3 \\
+    \hline
+    Analyseur (Python)         & \texttt{test\_facts.py},
+                                 \texttt{test\_rules.py},
+                                 \texttt{test\_engine.py}                 & 14 & 14 / 14 \\
+    \hline
+    Générateur (Python)        & \texttt{test\_consolidate.py},
+                                 \texttt{test\_prompt.py},
+                                 \texttt{test\_llm\_client.py},
+                                 \texttt{test\_cli\_doc.py}               & 22 & 22 / 22 \\
+    \hline
+    Orchestrateur (Python)     & \texttt{test\_orchestrator.py}           & 6 & 6 / 6 \\
+    \hline
+    \textbf{Total}             & 8 fichiers Python + 3 fichiers MATLAB    & \textbf{45} & \textbf{45 / 45} \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+Les vingt-neuf exigences logicielles \texttt{REQ-SW-*} sont
+couvertes à 100~\% par cette suite~: chaque exigence est associée à
+au moins un test \emph{pytest} ou \emph{matlab.unittest} qui en
+vérifie un invariant fonctionnel. La traçabilité exigence~$\to$~test
+est maintenue dans \texttt{validator/requirements/requirements.json}
+et croisée automatiquement par le script de \emph{coverage} de la
+suite Python.
+
+\section{Conclusion}
+\label{sec:ch4_conclusion}
+
+Ce chapitre a déroulé la branche Logicielle du V-model dual du
+projet, en parallèle exact de la branche Modèle traitée au
+chapitre~\ref{chap:partie_modele}. L'architecture modulaire en cinq
+composants — Validateur, Analyseur, Générateur de rapports,
+Orchestrateur et Interface utilisateur — a été conçue pour découpler
+les responsabilités, isoler les choix technologiques externes
+(notamment l'API Groq) et garantir la traçabilité de bout en bout
+des artefacts produits.
+
+Chaque module a été développé en suivant la même discipline~: une
+seule source de vérité par information (paramètres dans
+\texttt{init\_system.m}, règles dans
+\texttt{analyzer/knowledge/}, scénarios dans
+\texttt{orch.scenarios}), une sérialisation JSON systématique des
+sorties pour permettre l'inspection et la comparaison, et une
+gestion d'erreurs \emph{fail-fast} qui privilégie la lisibilité du
+diagnostic sur la sophistication de la récupération. L'interface
+graphique, développée en \textsc{MATLAB App~Designer}, expose
+l'ensemble en cinq vues thématiques sous un style sobre et
+professionnel cohérent avec l'environnement de travail quotidien de
+l'ingénieur de validation BMS.
+
+La validation unitaire du logiciel a porté sur quarante-cinq cas de
+test (quarante-deux \texttt{pytest} + trois \texttt{matlab.unittest})
+qui couvrent l'intégralité des vingt-neuf exigences
+\texttt{REQ-SW-*}. La dernière campagne enregistre 45/45 succès, ce
+qui clôt la phase de validation unitaire de la branche
+Logicielle.
+
+Le chapitre~\ref{chap:integration_validation} traite à présent la
+phase \emph{commune} aux deux branches du V~: l'intégration des deux
+sorties (système sous test du chapitre~3 et outil logiciel du
+chapitre~4) en un système complet, et la phase d'acceptation qui
+vérifie l'adéquation du tout aux besoins de l'utilisateur
+ingénieur, par déroulé des scénarios documentés au
+chapitre~\ref{chap:analyse_specification}.

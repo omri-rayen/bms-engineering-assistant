@@ -1,0 +1,1089 @@
+%% ============================================================
+%% CHAPITRE 3 — CONCEPTION ET DEVELOPPEMENT DE LA PARTIE MODELE
+%% ============================================================
+%% Session  : 3
+%% Auteur   : [Nom etudiant]
+%% Redige le: 12 mai 2026
+%% Inspecte : model/system/params/init_system.m (parametres reels),
+%%            model/plant/scripts/, model/bms/, model/fault_predictor/,
+%%            ai/fault_prediction/scripts/python/{model,train,preprocess,
+%%              evaluate,export_onnx}.py,
+%%            validator/reports/{plant_convergence,MIL,SIL,PIL,COV}.json
+%% ============================================================
+
+\chapter{Conception et développement de la partie modèle}
+\label{chap:partie_modele}
+
+\section{Introduction}
+\label{sec:ch3_introduction}
+
+Le chapitre~\ref{chap:analyse_specification} a énoncé les exigences
+auxquelles le système sous test doit satisfaire et a fixé l'architecture
+fonctionnelle dans laquelle s'insère la branche Modèle du V-model dual.
+Le présent chapitre est consacré à la matérialisation de cette branche~:
+il décrit comment le modèle physique de la batterie a été construit à
+partir d'un jeu de données mesurées, comment le calculateur de gestion
+(\emph{master} et \emph{slave}) a été développé pour exercer ses
+fonctions de surveillance, d'estimation et de protection, et comment le
+prédicteur LSTM a été entraîné puis intégré à la chaîne de calcul du
+\emph{master}.
+
+La structure du chapitre suit la progression descendante du V-model.
+Les exigences et l'architecture du modèle sont d'abord rappelées
+(section~\ref{sec:ch3_exigences_archi}). La modélisation du \emph{plant}
+est ensuite déroulée du jeu de données brut jusqu'au pack 96s1p
+complet (section~\ref{sec:ch3_plant}). Le développement du système
+BMS, puis l'intégration du prédicteur LSTM, sont décrits dans les
+sections~\ref{sec:ch3_bms_sut} et~\ref{sec:ch3_predicteur}. Le chapitre
+se conclut par la phase ascendante du V~: la validation unitaire en
+MIL, SIL et PIL (section~\ref{sec:ch3_validation_unitaire}), dont les
+résultats numériques sont extraits des rapports JSON produits par
+l'outil sur la dernière campagne en date (mai~2026).
+
+\section{Exigences et architecture du modèle}
+\label{sec:ch3_exigences_archi}
+
+\subsection{Exigences héritées du chapitre précédent}
+\label{subsec:ch3_exigences}
+
+La branche Modèle s'attache à satisfaire les trente-sept exigences
+\texttt{REQ-LL-*} cataloguées au chapitre~\ref{chap:analyse_specification}.
+Ces exigences se répartissent en six familles dont les seuils
+quantitatifs constituent le contrat de validation. Pour faciliter les
+références ultérieures, la table~\ref{tab:ch3_seuils_modele} reprend
+les seuils numériques effectivement programmés dans le fichier
+\path{model/system/params/init_system.m}, qui constitue la
+\emph{source unique de vérité} du projet.
+
+\begin{table}[H]
+  \centering
+  \caption{Seuils numériques du modèle (extraits de \texttt{init\_system.m}
+  et de \texttt{requirements.json}).}
+  \label{tab:ch3_seuils_modele}
+  \small
+  \begin{tabularx}{\textwidth}{|l|l|X|}
+    \hline
+    \textbf{Famille} & \textbf{Champ} & \textbf{Valeur} \\
+    \hline
+    Plant       & RMSE V\(_\text{pack}\) max          & 4{,}0 V \\
+    \hline
+    Plant       & RMSE SoC\(_\text{pack}\) max        & 1{,}0 \% \\
+    \hline
+    Plant       & RMSE T\(_\text{pack}\) max          & 1{,}0 \textcelsius \\
+    \hline
+    Tension     & OV warn / derate / shut             & 4{,}15 / 4{,}20 / 4{,}25 V \\
+    \hline
+    Tension     & UV warn / derate / shut             & 2{,}80 / 2{,}60 / 2{,}50 V \\
+    \hline
+    Température & OT warn / derate / shut             & 45 / 55 / 60 \textcelsius \\
+    \hline
+    Température & UT warn / derate / shut             &  0 / \(-10\) / \(-20\) \textcelsius \\
+    \hline
+    Courant     & OC charge warn / derate / shut      & 150 / 200 / 300 A \\
+    \hline
+    Courant     & OC décharge warn / derate / shut    & 350 / 420 / 500 A \\
+    \hline
+    Debounce    & N\(_\text{warn}\) / N\(_\text{derate}\) / N\(_\text{shut}\) & 10 / 30 / 5 pas (à \(\Delta t = 0{,}1\) s) \\
+    \hline
+    Protection  & I court-circuit (sans debounce)     & 800 A \\
+    \hline
+    Equilibrage & Seuil cellule / module / I\(_\text{nom}\) & 15 mV / 20 mV / 0{,}25 A \\
+    \hline
+    Equilibrage & SoC minimal de déclenchement        & 80 \% \\
+    \hline
+    Prédicteur  & Lead-time min OT / OV / UV          & 30 / 10 / 10 s \\
+    \hline
+    Prédicteur  & Détection min / faux-positifs max   & 75 \% / 10 \% \\
+    \hline
+    SIL         & Tolérance équivalence (rel / abs)   & \(10^{-2}\) / \(10^{-4}\) \\
+    \hline
+    PIL         & WCET max / RAM max                  & 10 ms / 256 kio \\
+    \hline
+    PIL         & Tolérance équivalence prédicteur    & \(10^{-3}\) (absolue) \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\subsection{Architecture générale~: \emph{plant}, SUT, boucle fermée}
+\label{subsec:ch3_archi_generale}
+
+L'architecture générale s'organise autour d'un \emph{system model}
+(\path{model/system/system_model.slx}) qui referme en boucle fermée
+le \emph{plant} (modèle physique de la batterie) et le \emph{system
+under test} (BMS \emph{master} + huit BMS \emph{slave} + prédicteur
+LSTM intégré au \emph{master}). Ce \emph{system model} sert d'environnement
+d'exécution commun à toutes les phases de validation~: les tests MIL le
+simulent directement, les tests SIL en exécutent une version où le
+\emph{master} est remplacé par son code C généré, et les tests PIL en
+exécutent une variante où le code du \emph{master} tourne sur la cible
+STM32~H7A3.
+
+\subsection{Structure hiérarchique~: cellule \(\rightarrow\) module \(\rightarrow\) pack}
+\label{subsec:ch3_hierarchie}
+
+Le \emph{plant} suit la structure physique du pack étudié~: la cellule
+élémentaire est une cellule cylindrique de capacité nominale 60~Ah~;
+douze cellules en série forment un module~; huit modules en série
+forment le pack 96s1p, soit 96~cellules au total. Cette hiérarchie est
+matérialisée par trois modèles distincts (\texttt{cell\_ecm\_2rc.slx},
+\texttt{module\_12s.slx}, \texttt{pack\_96s.slx}) liés par
+\emph{Model Reference}, ce qui permet de tester chaque niveau en
+isolation tout en garantissant que le pack assemble exactement les
+mêmes blocs que ceux validés au niveau cellule.
+
+\subsection{Interfaces \emph{master}\,/\,\emph{slave}}
+\label{subsec:ch3_interfaces}
+
+Chaque BMS \emph{slave} surveille les douze tensions cellulaires et
+les températures de son module, et émet vers le \emph{master} un mot
+de huit bits dit \texttt{fault\_flags\_8} encodant la sévérité par
+classe de défaut~: deux bits pour l'\emph{Over-Voltage} (OV), deux
+bits pour l'\emph{Under-Voltage} (UV), deux bits pour l'\emph{Over-Temperature}
+(OT) et deux bits pour l'\emph{Under-Temperature} (UT), avec la
+convention \(0\)~=~aucun défaut, \(1\)~=~\emph{warn}, \(2\)~=~\emph{derate},
+\(3\)~=~\emph{shut}. Le \emph{master} agrège ces huit mots, décode les
+classes individuelles dans son sous-système \texttt{Decode\_Fault\_Flags}
+(implémenté en \emph{Stateflow}) et alimente la machine à états de
+gestion des défauts. Cette interface compacte (\(8 \times 8 = 64\) bits
+par pas de calcul) garantit l'extensibilité à un pack de plus de huit
+modules sans modification du \emph{master}.
+
+\section{Modélisation du \emph{plant model}}
+\label{sec:ch3_plant}
+
+\subsection{Acquisition et préparation du jeu de données}
+\label{subsec:ch3_dataset_plant}
+
+Le jeu de données utilisé pour identifier puis valider le \emph{plant}
+est le jeu \emph{Battery and Heating Data in Real Driving Cycles}
+publié par Steinsträter, Buberger et Trifonov sur la plateforme
+\emph{IEEE DataPort}~\cite{Steinstraeter2020}. Il regroupe soixante-dix
+trajets enregistrés sur un véhicule BMW~i3 instrumenté, avec une
+fréquence d'échantillonnage de 10~Hz pour les grandeurs électriques
+et thermiques. Pour chaque trajet, le jeu fournit la tension de pack,
+le courant, la température moyenne des cellules et les conditions
+ambiantes, sur des durées allant de quelques minutes à plus de
+trois~mille secondes (le trajet \texttt{TripA06} dépasse ainsi
+3160~s).
+
+La revue qualité a porté sur trois aspects. La cohérence d'horodatage
+a été vérifiée trajet par trajet et les rares discontinuités ont été
+ré-échantillonnées par interpolation linéaire à \(\Delta t = 0{,}1\)~s,
+qui constitue le pas de calcul de référence du modèle. Les valeurs
+aberrantes (par exemple les pics de courant non physiques liés aux
+artefacts d'acquisition) ont été filtrées par un seuillage à \(\pm
+800\)~A, cohérent avec le seuil de protection matériel
+\texttt{bms.I\_SC\_thresh} configuré dans \texttt{init\_system.m}.
+Les valeurs manquantes en bord de trajet ont été tronquées plutôt
+qu'extrapolées. Le jeu nettoyé est versionné sous
+\texttt{data/cleaned/} et alimente trois usages distincts~: identifier
+les paramètres ECM, valider la convergence du \emph{plant}
+(section~\ref{subsec:ch3_validation_plant}) et constituer la trame de
+fond des scénarios d'injection de défauts pour entraîner le
+prédicteur (section~\ref{subsec:ch3_dataset_defauts}).
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{\centering\vspace{2.2cm}
+    \textit{[Courbes du dataset réel — exemple sur 3 trajets : tension
+    de pack, courant, température cellule, en fonction du temps]}
+    \vspace{2.2cm}}}
+  \caption{Échantillon de courbes du jeu de données \emph{Battery and
+  Heating Data in Real Driving Cycles}~\cite{Steinstraeter2020} après
+  nettoyage et ré-échantillonnage à 10~Hz.}
+  \label{fig:ch3_dataset_courbes}
+\end{figure}
+
+\subsection{Extraction et identification des paramètres}
+\label{subsec:ch3_identification_params}
+
+L'identification des paramètres du modèle ECM se déroule en deux étapes
+distinctes, conformément à la pratique recommandée par
+Hu~\textit{et~al.}~\cite{Hu2012}~: une étape \emph{directe} pour les
+paramètres statiques OCV et \(R_0\) qui sont mesurables sans hypothèse
+sur la dynamique, puis une étape de \emph{fitting} non linéaire pour
+les paramètres dynamiques \(R_1, C_1, R_2, C_2\).
+
+\paragraph{Méthode directe pour OCV(SoC, T) et \(R_0\)(SoC, T).}
+La table OCV est extraite par les phases de pseudo-équilibre des
+trajets longs~: les segments où le courant reste sous \(\pm 1\)~A
+pendant plus de cinq minutes sont considérés comme proches de
+l'équilibre, et la tension cellulaire moyenne y est associée à la
+valeur de SoC obtenue par comptage de coulombs depuis le dernier point
+de référence. Cette procédure, implémentée dans le script
+\texttt{model/plant/scripts/extract\_ocv.py}, produit une grille
+bidimensionnelle (SoC, température) interpolée linéairement par les
+blocs \emph{Lookup Table} de \textsc{Simulink}.
+
+La résistance série \(R_0\) est extraite par les transitions rapides
+de courant~: la chute instantanée de tension lors d'un saut de
+courant donne, par division, la valeur de \(R_0\) à l'état de charge
+et à la température courants. Le script
+\texttt{extract\_ecm\_params.py} agrège ces estimations sur l'ensemble
+des trajets et produit la table \(R_0\)(SoC, T).
+
+\paragraph{Identification par moindres carrés des branches RC.}
+Les paramètres dynamiques \(R_1, C_1, R_2, C_2\) sont identifiés par
+ajustement non linéaire de la réponse temporelle du modèle ECM~2RC à
+des fenêtres de courant transitoire issues des trajets. La fonction
+de coût retenue est la somme des carrés des écarts entre tension
+mesurée et tension simulée sur chaque fenêtre, et la résolution
+s'appuie sur l'algorithme de Levenberg-Marquardt fourni par la
+bibliothèque \texttt{scipy.optimize}. Comme préconisé par
+Plett~\cite{Plett2004}, la séparation des deux constantes de temps
+(\(\tau_1 = R_1 C_1\) pour la dynamique d'activation rapide,
+\(\tau_2 = R_2 C_2\) pour la diffusion plus lente) est imposée par
+des bornes initiales contrastées qui empêchent l'algorithme de
+collapse les deux branches sur la même échelle de temps. L'ensemble
+des tables identifiées est sérialisé en \texttt{ecm\_params.mat} et
+chargé au démarrage par \texttt{init\_system.m}.
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{\centering\vspace{2.2cm}
+    \textit{[LUT OCV(SoC, T) et R0(SoC, T) — surfaces 3D ou heatmaps,
+    deux planches côte à côte]}
+    \vspace{2.2cm}}}
+  \caption{Tables d'interpolation \(\mathrm{OCV}(\mathrm{SoC},T)\) (à
+  gauche) et \(R_0(\mathrm{SoC},T)\) (à droite) extraites par méthode
+  directe sur l'ensemble des soixante-dix trajets.}
+  \label{fig:ch3_lut_ocv_r0}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{\centering\vspace{2cm}
+    \textit{[Résultats de fitting des branches RC — superposition
+    tension mesurée vs simulée sur 2-3 fenêtres de courant transitoire]}
+    \vspace{2cm}}}
+  \caption{Validation visuelle de l'identification des branches RC~:
+  superposition tension mesurée et tension reconstruite par le modèle
+  ECM~2RC sur des fenêtres de courant transitoire représentatives.}
+  \label{fig:ch3_fitting_rc}
+\end{figure}
+
+\subsection{Modèle de cellule ECM~2RC}
+\label{subsec:ch3_cellule_ecm}
+
+Le modèle de cellule reprend l'équation~(\ref{eq:ecm_2rc}) introduite
+au chapitre~\ref{chap:cadre_etat_art}. Sa dynamique est complétée par
+les équations différentielles régissant les deux branches RC
+parallèles
+\begin{equation}
+\dot V_{\mathrm{RC}_i}(t) = -\frac{V_{\mathrm{RC}_i}(t)}{R_i \, C_i}
+                            + \frac{I(t)}{C_i},
+\qquad i \in \{1, 2\},
+\label{eq:ecm_2rc_dyn}
+\end{equation}
+intégrées par la méthode d'Euler explicite à \(\Delta t = 0{,}1\)~s,
+qui correspond au pas de calcul nominal du \emph{master} embarqué.
+L'état de charge est estimé par comptage de coulombs
+\begin{equation}
+\mathrm{SoC}(t) = \mathrm{SoC}(0) - \frac{1}{Q_\text{nom}} \int_0^t I(\tau)\,\mathrm d\tau,
+\label{eq:soc_coulomb}
+\end{equation}
+avec \(Q_\text{nom} = 60\)~Ah pour la cellule de référence.
+
+Le nœud thermique est modélisé par une équation R-C de premier ordre
+qui couple la cellule au liquide de refroidissement et à l'ambiant~:
+\begin{equation}
+m_\text{cell}\,c_p\,\frac{\mathrm d T_\text{cell}}{\mathrm d t} =
+   R_0\,I^2 - h_\text{cool}\,(T_\text{cell} - T_\text{cool})
+            - h_\text{amb}\,(T_\text{cell} - T_\text{amb}),
+\label{eq:noeud_thermique}
+\end{equation}
+où la dissipation par effet Joule \(R_0 I^2\) constitue la source
+unique de chaleur, et où les coefficients \(h_\text{cool}\) et
+\(h_\text{amb}\) sont identifiés trajet par trajet par le script
+\texttt{calibrate\_thermal\_params.m}. Cette formulation simplifiée
+suppose que la diffusion thermique interne à la cellule est
+négligeable devant les échanges avec le coolant, hypothèse vérifiée
+empiriquement sur le jeu de données par une comparaison entre la
+température prédite et la température mesurée de surface (RMSE
+inférieure à 1~\textcelsius{} par trajet, voir
+section~\ref{subsec:ch3_validation_plant}).
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.8\textwidth}{\centering\vspace{2cm}
+    \textit{[Schéma électrique du modèle ECM 2RC :}\\
+    \textit{OCV(SoC,T) en série avec R0, suivi de deux mailles R-C
+    parallèles, sortie V]}
+    \vspace{2cm}}}
+  \caption{Schéma électrique du modèle de cellule ECM~2RC retenu, avec
+  source de tension OCV dépendant du SoC et de la température,
+  résistance série \(R_0\) et deux branches RC en série modélisant
+  les dynamiques d'activation et de diffusion.}
+  \label{fig:ch3_schema_ecm}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{\centering\vspace{2cm}
+    \textit{[Capture du modèle Simulink \texttt{cell\_ecm\_2rc.slx} :}\\
+    \textit{blocs OCV LUT, R0 LUT, deux blocs Integrator pour V\_RC1
+    et V\_RC2, sommateur, port de sortie V]}
+    \vspace{2cm}}}
+  \caption{Modèle \textsc{Simulink} de la cellule ECM~2RC
+  (\texttt{model/plant/cell\_ecm\_2rc.slx}).}
+  \label{fig:ch3_simulink_cellule}
+\end{figure}
+
+\subsection{Modélisation du module et du pack}
+\label{subsec:ch3_module_pack}
+
+\paragraph{Module 12s.}
+Le modèle de module (\texttt{module\_12s.slx}) instancie douze cellules
+ECM~2RC en série au moyen d'un bloc \emph{For Each Subsystem} qui
+parallélise efficacement le calcul. Chaque cellule reçoit en entrée
+un vecteur de paramètres dérivé de la cellule nominale et perturbé par
+les facteurs de dispersion intercellulaire décrits ci-dessous.
+
+\paragraph{Pack 96s1p et boucle de refroidissement.}
+Le modèle de pack (\texttt{pack\_96s.slx}) connecte huit modules en
+série et y greffe la boucle thermique complète~: une masse de coolant
+de 8~kg circule à travers les huit modules avec un coefficient
+d'échange \(h_\text{cool}\) identifié par cellule, puis dissipe sa
+chaleur dans un radiateur de coefficient \(h_\text{rad} = 40\)~W/K
+ou la rejette dans un \emph{chiller} de puissance maximale 5~kW. Un
+\emph{heater} de 7~kW est activé en parallèle lorsque la
+température descend sous le seuil de déclenchement
+\(T_\text{heat\_on} = 8\)~\textcelsius~; il s'éteint lorsque la
+température dépasse le seuil de coupure
+\(T_\text{heat\_off} = T_\text{heat\_target} = 18\)~\textcelsius. La
+relation symétrique régit le \emph{chiller} entre 25 et 35~\textcelsius.
+Cette hystérésis garantit la non-pulsation des actionneurs
+thermiques et alimente la vérification de l'exigence
+\texttt{REQ-LL-BMS-THM-01}.
+
+\paragraph{Facteurs de dispersion cellule par cellule.}
+La dispersion intercellulaire est introduite de manière
+\emph{déterministe} et \emph{persistée}, conformément à la philosophie
+\emph{single source of truth} du projet. Le bloc d'initialisation de
+\texttt{init\_system.m} génère, à la première exécution, trois
+matrices \(12 \times 8\) (douze cellules, huit modules) avec une
+graine fixée à 42~: une dispersion de capacité \(\pm 3\,\%\) à \(1\sigma\)
+bornée à \([0{,}91, 1{,}09]\,Q_\text{nom}\), une dispersion d'état
+de charge initial de \(\pm 1\,\%\) à \(1\sigma\) à laquelle s'ajoute
+un biais systématique inter-modules de \(\pm 2\,\%\) répartis
+linéairement, et une dispersion de \(R_0\) de \(\pm 5\,\%\) à \(1\sigma\)
+bornée à \([0{,}85, 1{,}15]\). Le tirage est sauvegardé dans
+\texttt{cell\_variability.mat} et chargé identiquement sur toutes les
+exécutions ultérieures, ce qui garantit la reproductibilité bit à
+bit des campagnes de validation et permet au \emph{predictor} d'être
+entraîné sur les mêmes biais de pack que ceux exercés en MIL.
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.9\textwidth}{\centering\vspace{2.5cm}
+    \textit{[Architecture du pack 96s1p en Simulink :}\\
+    \textit{8 modules \texttt{module\_12s} en série, sommateur de
+    tensions, boucle thermique avec coolant pump, radiateur, heater,
+    chiller, capteurs de température sur quatre points du circuit]}
+    \vspace{2.5cm}}}
+  \caption{Architecture du pack 96s1p assemblant huit modules
+  \texttt{module\_12s} en série et la boucle de refroidissement
+  associée.}
+  \label{fig:ch3_archi_pack}
+\end{figure}
+
+\section{Développement du système BMS (System Under Test)}
+\label{sec:ch3_bms_sut}
+
+Le système sous test se compose de deux modèles \textsc{Simulink}
+distincts~: le BMS \emph{slave}, instancié huit fois en parallèle
+par le \emph{system model}, et le BMS \emph{master}, présent en
+exemplaire unique. Cette section décrit chacun des deux modèles en
+remontant des fonctions de surveillance les plus élémentaires aux
+fonctions d'arbitrage les plus globales.
+
+\subsection{BMS \emph{slave}}
+\label{subsec:ch3_bms_slave}
+
+\paragraph{Surveillance tension et température à trois niveaux.}
+Chaque \emph{slave} surveille les douze tensions cellulaires de son
+module et les températures issues des capteurs locaux. Pour chacune
+de ces grandeurs, trois comparateurs successifs vérifient le
+franchissement des seuils \emph{warn}, \emph{derate} et \emph{shut},
+respectivement à 4{,}15, 4{,}20 et 4{,}25~V pour
+l'\emph{Over-Voltage}, et symétriquement à 2{,}80, 2{,}60 et 2{,}50~V
+pour l'\emph{Under-Voltage}. Pour la température, les seuils sont
+respectivement de 45, 55 et 60~\textcelsius{} pour
+l'\emph{Over-Temperature}, et de 0, \(-10\) et \(-20\)~\textcelsius{}
+pour l'\emph{Under-Temperature}.
+
+Pour éviter les déclenchements intempestifs sur des transitoires de
+mesure, chaque comparaison est filtrée par un compteur de
+\emph{debounce} qui n'élève la sévérité que si le seuil est dépassé
+pendant au moins \(N_\text{warn} = 10\) pas, \(N_\text{derate} = 30\)
+pas ou \(N_\text{shut} = 5\) pas, soit respectivement 1~s, 3~s et
+0{,}5~s à \(\Delta t = 0{,}1\)~s. La valeur réduite pour le niveau
+\emph{shut} traduit la criticité supérieure de ce niveau~: il faut
+réagir vite, mais le seuil correspondant est suffisamment éloigné du
+seuil \emph{derate} pour qu'un dépassement transitoire n'y conduise
+pas spuriously.
+
+\paragraph{Génération du flag d'état (mot de huit bits).}
+La sortie du \emph{slave} vers le \emph{master} consiste en un mot
+unique \texttt{fault\_flags\_8} de 8~bits, dont la structure a été
+décrite à la section~\ref{subsec:ch3_interfaces}. Cette compactification
+réduit la bande passante de communication entre \emph{slave} et
+\emph{master} et facilite l'extension future à un pack à plus de huit
+modules.
+
+\paragraph{Équilibrage passif local.}
+L'équilibrage passif est piloté par le \emph{slave} sous l'autorisation
+arbitrée du \emph{master} (\texttt{enable\_bal\_8}, un bit par
+module). Lorsque l'équilibrage est autorisé, le \emph{slave} sélectionne
+la cellule de plus haute tension de son module et active le
+résistor de décharge correspondant à un courant nominal
+\(I_\text{bal,nom} = 0{,}25\)~A. Le seuil de déclenchement local est
+fixé à 15~mV de différentiel entre les cellules du module
+(\texttt{bal\_dV\_thresh}), valeur compatible avec les pratiques de
+l'industrie pour un pack de production.
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{\centering\vspace{2.2cm}
+    \textit{[Diagramme logique du BMS slave : entrées V\_cells\_12 et
+    T\_sensors\_4, comparateurs à 3 niveaux, debounce counters,
+    encodage fault\_flags\_8, balancing passive, sortie vers master]}
+    \vspace{2.2cm}}}
+  \caption{Diagramme logique du BMS \emph{slave} (\texttt{model/bms/bms\_slave.slx}).}
+  \label{fig:ch3_diagram_slave}
+\end{figure}
+
+\subsection{BMS \emph{master}}
+\label{subsec:ch3_bms_master}
+
+Le BMS \emph{master} est le calculateur le plus complexe du système
+sous test~: il agrège les sorties des huit \emph{slave}, exécute la
+totalité des fonctions d'estimation et de protection au niveau pack,
+et héberge le réseau LSTM de prédiction des défauts. Sa structure
+interne se décompose en huit sous-systèmes principaux que les
+paragraphes suivants décrivent par ordre fonctionnel.
+
+\paragraph{Agrégation et décodage des signaux entrants
+(\texttt{Signal\_Aggregator}).}
+L'agrégateur reconstruit, à partir des huit mots
+\texttt{fault\_flags\_8}, les huit vecteurs de sévérité par classe
+(\texttt{OV\_sev\_8}, \texttt{UV\_sev\_8}, \texttt{OT\_sev\_8},
+\texttt{UT\_sev\_8}) au moyen du sous-bloc
+\texttt{Decode\_Fault\_Flags}, implémenté en \emph{Stateflow} pour
+exploiter directement la sémantique de manipulation de bits. Il
+calcule en parallèle les agrégats min et max sur les 96~tensions
+cellulaires et les 32~capteurs de température (un par cellule
+échantillon plus quatre par module), qui alimentent à la fois la
+fonction d'arbitrage de l'équilibrage et le prédicteur LSTM.
+
+\begin{sloppypar}
+\paragraph{Debounce de sévérité et surveillance du courant
+(\texttt{Fault\_Debounce}, \texttt{Current\_Monitor}).}
+Le bloc de \emph{debounce} confirme la sévérité globale agrégée des
+slaves selon la même logique à trois niveaux que celle du \emph{slave},
+mais cette fois sur les sévérités déjà décodées. La surveillance du
+courant duplique cette structure pour le courant de pack mesuré, avec
+des seuils différenciés en charge (150 / 200 / 300~A) et en décharge
+(350 / 420 / 500~A).
+\end{sloppypar}
+
+\paragraph{Estimation du SoC par filtrage de Kalman étendu
+(\texttt{EKF\_SoC\_Estimator}).}
+L'estimation du SoC repose sur un filtre de Kalman étendu de
+dimension trois, dont l'état est \(\bigl[\mathrm{SoC},\,
+V_{\mathrm{RC}_1},\, V_{\mathrm{RC}_2}\bigr]^\top\), conformément à la
+formulation de Plett~\cite{Plett2004}. Les bruits de modèle sont
+réglés à \(Q_\text{SoC} = 10^{-7}\),
+\(Q_{V_{\mathrm{RC}_i}} = 10^{-6}\) et le bruit de mesure à
+\(R_V = 10^{-3}\), et la covariance initiale du SoC vaut
+\(P_0 = 10^{-2}\). L'exigence \texttt{REQ-LL-BMS-SOC-01} impose une
+convergence à 3~\% près en moins de 60~s à partir d'un offset
+initial de 2~\%, ce qui contraint le rapport
+\(Q_\text{SoC} / R_V\) du filtre.
+
+\paragraph{Estimation du SoH (\texttt{SoH\_Estimator}).}
+L'état de santé est estimé par couplage de deux mécanismes. Le
+premier est un comptage de coulombs cumulé entre deux instants où
+\(\Delta\mathrm{SoC} \geq 10\,\%\), qui compare la capacité réellement
+échangée à la capacité nominale et en déduit un facteur de
+dégradation. Le second est une estimation de la résistance interne
+\(R_0\) par moyenne exponentielle (\texttt{alpha\_ema = 0{,}05}) sur
+les segments à fort courant. La borne basse de SoH est fixée à 0{,}5~:
+en deçà, le pack est considéré comme inutilisable. La sortie est
+contrainte non croissante sur l'horizon d'un trajet, conformément à
+\texttt{REQ-LL-BMS-SOH-01}.
+
+\paragraph{Machine à états de gestion des défauts
+(\texttt{Fault\_Severity\_FSM}).}
+La machine à états centrale arbitre la sévérité globale du système
+selon le motif \emph{Nominal}~$\rightarrow$~\emph{Warn}~$\rightarrow$~\emph{Derate}~$\rightarrow$~\emph{Shut},
+avec les transitions descendantes \emph{Warn}~$\rightarrow$~\emph{Nominal}
+autorisées en cas de retour sous seuil, mais la transition
+ascendante \emph{Derate}~$\rightarrow$~\emph{Shut} verrouillée~: une
+fois entré en \emph{Shut}, le système y reste jusqu'à
+réinitialisation. Cette logique de \emph{latch} sur le niveau
+critique est imposée par \texttt{REQ-LL-BMS-FSM-01} et reflète les
+pratiques de l'industrie en matière de tolérance aux défauts.
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.8\textwidth}{\centering\vspace{2.2cm}
+    \textit{[Diagramme FSM Stateflow : 4 états (Nominal, Warn, Derate,
+    Shut), transitions montantes/descendantes, latch sur Shut]}
+    \vspace{2.2cm}}}
+  \caption[Diagramme FSM de gestion des défauts (\texttt{Fault\_Severity\_FSM})]{Diagramme de la machine à états de gestion des défauts
+  (\texttt{Fault\_Severity\_FSM}, implémentée en \emph{Stateflow}).}
+  \label{fig:ch3_fsm_master}
+\end{figure}
+
+\paragraph{Watchdog de supervision des slaves (\texttt{Slave\_Watchdog}).}
+Le chien de garde surveille la fraîcheur des mots
+\texttt{fault\_flags\_8} en provenance de chaque \emph{slave}~: si un
+mot reste inchangé pendant plus de \(N_\text{watchdog} = 100\) pas
+(soit 10~s à \(\Delta t = 0{,}1\)~s), le \emph{slave} concerné est
+marqué comme déconnecté. La sévérité du système est alors élevée selon
+le nombre de \emph{slave} déconnectés simultanés, conformément à
+l'échelle dégressive 0/1/2-3/4+ codée dans \texttt{REQ-LL-BMS-WDG-02}.
+
+\paragraph{Arbitrage de l'équilibrage et limitation de puissance
+(\texttt{Balancing\_Arbitrator}, \texttt{Power\_Limiter}).}
+L'arbitre d'équilibrage décide à chaque pas quel(s) module(s)
+peu(ven)t activer leur équilibrage passif local. La règle de décision
+combine quatre conditions vérifiées en logique \emph{ET}~: la
+sévérité globale doit être inférieure ou égale à \emph{Warn},
+l'écart moyen de tension du module au pack doit dépasser
+\texttt{bal\_dV\_module\_thresh = 20}~mV, le SoC du pack doit
+dépasser 80~\%, et le \emph{slave} concerné ne doit pas être
+\emph{ratrapé} par un module concurrent dans la même fenêtre. La
+sortie est un vecteur \texttt{enable\_bal\_8} d'un bit par module.
+Le limiteur de puissance, en aval, calcule
+\(P_\text{lim} = \min(k_\text{SoC}, k_\text{temp}) \cdot P_\text{nom}\)
+où \(k_\text{SoC}\) traduit la marge en énergie disponible et
+\(k_\text{temp}\) la marge thermique~; les valeurs sont saturées à
+zéro lorsque la FSM est en \emph{Shut}, ce qui garantit l'isolation
+électrique du pack en cas de défaut critique.
+
+\paragraph{Protection matérielle (\texttt{HW\_Protection}).}
+La protection matérielle court-circuite la chaîne de \emph{debounce}
+en cas de surintensité majeure. Si \(|I_\text{pack}| \geq
+800\)~A à un instant quelconque, le bit \texttt{shutdown\_cmd} est
+asserté en moins d'un pas, sans attente du moindre filtrage. Cette
+voie redondante est imposée par \texttt{REQ-LL-BMS-HWP-01} et
+constitue le dernier rempart contre les défauts d'évolution
+ultra-rapide (court-circuit interne, perte de séparateur).
+
+\section{Intégration du module de prédiction IA}
+\label{sec:ch3_predicteur}
+
+Le module de prédiction LSTM constitue la contribution \emph{intelligente}
+du système sous test~: il anticipe trois classes de défauts —
+\emph{Over-Temperature}, \emph{Over-Voltage}, \emph{Under-Voltage} —
+plusieurs dizaines de secondes avant que la chaîne classique de
+\emph{debounce} ne les détecte. Cette anticipation laisse au
+\emph{master} le temps de prendre des actions préventives non
+intrusives (lissage des limitations de puissance, anticipation
+thermique) sans déclencher prématurément la machine à états critique.
+
+\subsection{Génération du jeu de données de défauts}
+\label{subsec:ch3_dataset_defauts}
+
+Le jeu d'entraînement du LSTM est généré en boucle fermée par le
+\emph{system model}, en injectant artificiellement des défauts
+physiques sur les soixante-dix trajets nettoyés. La procédure,
+implémentée dans
+\path{ai/fault_prediction/scripts/matlab/generate_fault_dataset.m},
+parcourt l'ensemble des trajets et applique sur chacun une grille de
+scénarios d'injection couvrant les trois classes ciblées.
+L'\emph{Over-Temperature} est simulée par une augmentation
+progressive du coefficient de génération de chaleur d'une cellule
+choisie aléatoirement~; l'\emph{Over-Voltage} et l'\emph{Under-Voltage}
+sont simulées par un biais croissant sur la tension d'OCV d'une
+cellule, modélisant respectivement un déséquilibre de charge ou une
+perte de capacité localisée. Pour chaque trajet et chaque scénario,
+la simulation produit la séquence des huit \emph{features} d'entrée
+du réseau (voir paragraphe suivant) ainsi que la séquence
+\emph{ground truth} des trois classes de défauts. L'ensemble est
+sérialisé dans \path{ai/fault_prediction/data/dataset.mat} avec
+un \texttt{log.csv} associé qui trace, pour chaque exécution, le
+trajet d'origine, l'identifiant de scénario et le type de défaut
+injecté.
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{\centering\vspace{2.2cm}
+    \textit{[Pipeline de génération des défauts :}\\
+    \textit{trajets nettoyés \(\rightarrow\) closed-loop sim \(\rightarrow\)
+    injection physique \(\rightarrow\) datasets X (8 features × W) +
+    Y (3 classes) sérialisés en .mat]}
+    \vspace{2.2cm}}}
+  \caption{Pipeline de génération du jeu de données de défauts par
+  simulation en boucle fermée du \emph{plant} et du SUT, avec
+  injection physique de défauts OT, OV et UV.}
+  \label{fig:ch3_pipeline_defauts}
+\end{figure}
+
+\subsection{Prétraitement et partitionnement}
+\label{subsec:ch3_pretraitement}
+
+Le prétraitement (\texttt{ai/fault\_prediction/scripts/python/preprocess.py})
+transforme les exécutions brutes en fenêtres glissantes
+exploitables par le réseau. Huit \emph{features} sont retenues~: la
+tension cellulaire minimale et maximale du pack
+(\texttt{Vmin}, \texttt{Vmax}), le SoC du pack, la température
+maximale (\texttt{Tmax}) et la température du coolant
+(\texttt{Tcool}), le courant de pack (\texttt{Ipack}) et deux
+dérivées temporelles à pas fixe (\texttt{dVmin}, \texttt{dTmax}). La
+fenêtre temporelle vaut \(W = 50\) échantillons à
+\(\Delta t = 0{,}1\)~s, soit cinq secondes d'historique~; le pas de
+glissement est unitaire (\(S = 1\)) afin de cadencer l'inférence
+embarquée à la même fréquence que le contrôle.
+
+L'étiquetage est anticipatif~: la classe à l'instant \(t\) est
+celle effectivement observée à \(t + H_c\), où le \emph{look-ahead}
+\(H_c\) vaut 300~échantillons (30~s) pour l'OT, 100~échantillons
+(10~s) pour l'OV et 100~échantillons (10~s) pour l'UV. Cette
+asymétrie reflète la dynamique plus lente des défauts thermiques. À
+l'inférence, le réseau prédit donc, à partir des cinq dernières
+secondes de mesure, l'état du pack tel qu'il sera dans 10 à 30~s.
+
+Le partitionnement est réalisé au niveau du \emph{trajet}, et non au
+niveau de la fenêtre, pour éviter toute fuite d'information entre
+les ensembles. Sur les 70~trajets disponibles, 70~\% sont alloués à
+l'entraînement, 15~\% à la validation et 15~\% au test, avec une
+contrainte de couverture~: au moins un trajet contenant un
+événement OT et un trajet contenant un événement UV doivent figurer
+dans chacun des trois ensembles, faute de quoi les classes
+minoritaires ne pourraient être ni apprises ni évaluées. La graine
+du tirage est fixée à 42, identique à celle de la dispersion
+intercellulaire, ce qui garantit la reproductibilité de l'ensemble
+de la chaîne.
+
+\subsection{Conception et entraînement du réseau LSTM}
+\label{subsec:ch3_lstm}
+
+Le réseau (\texttt{ai/fault\_prediction/scripts/python/model.py}) est
+volontairement compact, en cohérence avec la cible embarquée. Il se
+compose d'une couche LSTM unique à 32~unités cachées (entrée à
+8~\emph{features}, séquence de 50~pas), d'un \emph{dropout} à 0{,}2,
+d'une couche dense intermédiaire à 16~unités munie d'une activation
+ReLU, et d'une couche de sortie à 3~unités produisant les \emph{logits}
+des trois classes. La probabilité finale est obtenue par sigmoïde
+indépendante par classe (problème multi-étiquette, et non
+multi-classe), ce qui autorise la coexistence de plusieurs défauts
+simultanés.
+
+L'entraînement (\texttt{train.py}) utilise une perte
+\emph{Binary Cross-Entropy with Logits} pondérée par classe pour
+compenser l'extrême déséquilibre du jeu (les classes positives
+représentent moins de 1~\% des fenêtres). Le poids de chaque classe
+est calculé comme \(w_c = N_\text{neg} / N_\text{pos}\), borné à 25
+afin d'éviter qu'une classe rare ne domine numériquement la perte.
+L'optimiseur retenu est Adam, avec un taux d'apprentissage initial
+de \(2 \times 10^{-3}\), un \emph{batch size} de 1024 fenêtres, et
+un budget maximal de 25~époques avec \emph{early stopping} sur la
+perte de validation après 5~époques sans amélioration. La graine
+aléatoire est fixée à 42 sur les trois bibliothèques (Python,
+\texttt{numpy}, \texttt{torch}), conformément aux exigences de
+reproductibilité du projet.
+
+À l'issue de l'entraînement, les seuils de décision par classe sont
+optimisés sur l'ensemble de validation pour maximiser le score
+\(F_{\beta=0{,}5}\), qui privilégie la précision sur le rappel. Cette
+asymétrie volontaire reflète la primauté donnée à la maîtrise du
+taux de fausses alarmes, dont le maximum admissible est fixé à
+10~\% (\texttt{REQ-LL-PRD-FAR-01}). Les seuils ainsi déterminés sont
+sérialisés en \texttt{thresholds.json} et chargés à l'exécution par
+le bloc \emph{Stateflow} qui interprète la sortie du réseau.
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{\centering\vspace{2.2cm}
+    \textit{[Courbes loss train/validation au fil des époques,}\\
+    \textit{F1 par classe au fil des époques,}\\
+    \textit{best epoch annotée]}
+    \vspace{2.2cm}}}
+  \caption{Courbes d'apprentissage du réseau LSTM~: perte
+  d'entraînement et de validation (gauche), score F1 par classe sur
+  l'ensemble de validation (droite).}
+  \label{fig:ch3_courbes_lstm}
+\end{figure}
+
+\subsection{Intégration et déploiement dans \textsc{Simulink}}
+\label{subsec:ch3_integration_lstm}
+
+Le modèle entraîné est exporté au format ONNX par le script
+\texttt{export\_onnx.py}, qui empile le réseau \texttt{FaultLSTM}
+avec un \texttt{ProbWrapper} appliquant la sigmoïde finale à
+l'inférence. L'artefact obtenu est déposé sous
+\texttt{model/fault\_predictor/inference/}, qui constitue la source
+unique de vérité côté \textsc{MATLAB}. Le script
+\texttt{import\_fault\_predictor.m} importe ce fichier ONNX en un
+réseau \texttt{dlnetwork} natif via la fonction
+\texttt{importONNXNetwork}, puis le sérialise en bloc
+\emph{Predict} consommable par \textsc{Simulink}. Cette double
+sérialisation garantit que le modèle entraîné en \emph{Python} et le
+modèle exécuté en \textsc{MATLAB} produisent le même résultat à la
+précision \emph{single} près, propriété vérifiée par la chaîne
+SIL/PIL (sections~\ref{subsec:ch3_validation_sil}
+et~\ref{subsec:ch3_validation_pil}).
+
+L'intégration au \emph{master} consiste à connecter, en entrée du
+bloc \emph{Predict}, les huit \emph{features} agrégées par le bloc
+\texttt{Signal\_Aggregator}, et à interpréter les trois sorties
+\(\mathrm{prob}_3 = (\text{p\_OT}, \text{p\_OV}, \text{p\_UV})\) au
+moyen d'un sous-bloc \emph{Stateflow} qui applique les seuils
+\(\mathtt{fp\_thresholds}\) et émet les trois bits d'alarme
+correspondants. Ces alarmes sont remontées comme signaux
+informationnels au superviseur~: elles ne court-circuitent pas la
+machine à états classique, mais peuvent être consommées par les
+fonctions de limitation préventive de puissance.
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{\centering\vspace{2.2cm}
+    \textit{[Capture du sous-système \texttt{Fault\_Predictor} dans
+    \texttt{bms\_master.slx} : entrée 8 features × 50 timesteps,
+    bloc Predict (LSTM dlnetwork), sortie prob\_3, seuillage
+    Stateflow, sortie alarm\_3]}
+    \vspace{2.2cm}}}
+  \caption[Intégration du bloc LSTM dans \texttt{bms\_master.slx}]{Intégration du bloc LSTM dans le BMS \emph{master}
+  (\texttt{model/bms/master/bms\_master.slx}).}
+  \label{fig:ch3_lstm_simulink}
+\end{figure}
+
+\section{Validation unitaire du modèle}
+\label{sec:ch3_validation_unitaire}
+
+Cette section présente les résultats effectifs des trois niveaux de
+validation unitaire du modèle. Tous les chiffres cités proviennent
+des rapports JSON produits par l'outil entre le 8 et le 11~mai 2026
+et stockés sous \texttt{validator/reports/}. L'objectif n'est pas de
+détailler la totalité des trente-sept tests automatisés, mais de
+synthétiser les résultats par famille et de mettre en évidence les
+quelques résultats les plus représentatifs.
+
+\subsection{Stratégie de validation et harnais de test \textsc{Simulink}}
+\label{subsec:ch3_strategie}
+
+La stratégie repose sur un principe simple~: chaque exigence est
+couverte par exactement un fichier de test dédié, nommé
+\texttt{test\_<REQ-ID>.m} et placé dans le répertoire de la phase
+correspondante (\texttt{validator/mil/tests/\{plant,bms,predictor\}/},
+\texttt{validator/sil/tests/}, \texttt{validator/pil/tests/}). Chaque
+test construit son propre \emph{harness} en réutilisant les
+\emph{helpers} du package \texttt{+val} (notamment
+\texttt{val.master\_inputs} qui assemble un
+\texttt{Simulink.SimulationData.Dataset} cohérent avec les inports
+racines du \emph{master}, et \texttt{val.signal} qui résout les
+signaux loggés par nom ou par bloc source). Le verdict est calculé
+par comparaison aux seuils numériques de \texttt{init\_system.m}, et
+sérialisé sous forme d'un objet JSON contenant l'identifiant
+d'exigence, la liste des contrôles individuels avec leurs valeurs
+mesurées et leurs seuils, et un chemin vers une figure de synthèse.
+
+\subsection{MIL — Convergence du \emph{plant} et comportement du BMS}
+\label{subsec:ch3_validation_plant}
+
+\paragraph{Convergence du \emph{plant} (REQ-LL-PLT-*).}
+La validation du \emph{plant} compare, sur les 70~trajets disponibles,
+les sorties du modèle (\(V_\text{pack}\), \(\mathrm{SoC}_\text{pack}\),
+\(T_\text{pack}\)) aux mesures correspondantes du jeu réel. La
+table~\ref{tab:ch3_resultats_plant} synthétise les RMSE médianes,
+moyennes et maximales obtenues lors de la dernière campagne
+(\texttt{plant\_convergence.json}, 8~mai 2026, \texttt{run\_id}
+\texttt{20260508\_005419}).
+
+\begin{table}[H]
+  \centering
+  \caption[Résultats de la convergence du \emph{plant} sur 70~trajets]{Résultats de la convergence du \emph{plant} sur 70~trajets
+  (extraits de \texttt{validator/reports/plant\_convergence.json}).
+  Tous les seuils \texttt{REQ-LL-PLT-*} sont satisfaits.}
+  \label{tab:ch3_resultats_plant}
+  \small
+  \begin{tabularx}{\textwidth}{|l|X|X|X|X|}
+    \hline
+    \textbf{Grandeur} & \textbf{Médiane} & \textbf{Moyenne} & \textbf{Max} & \textbf{Seuil REQ} \\
+    \hline
+    RMSE \(V_\text{pack}\)            & 1{,}05 V & 1{,}48 V & 6{,}33 V (\texttt{TripA07}) & \(\leq\) 4{,}0 V (médiane) \\
+    \hline
+    RMSE \(\mathrm{SoC}_\text{pack}\) & 0{,}45 \% & 0{,}50 \% & 1{,}83 \% (\texttt{TripB07}) & \(\leq\) 1{,}0 \% (médiane) \\
+    \hline
+    RMSE \(T_\text{pack}\)            & 0{,}70 \textcelsius{} & 0{,}90 \textcelsius{} & 3{,}57 \textcelsius{} (\texttt{TripA07}) & \(\leq\) 1{,}0 \textcelsius{} (médiane) \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+Les trois exigences \texttt{REQ-LL-PLT-V-01}, \texttt{REQ-LL-PLT-SOC-01}
+et \texttt{REQ-LL-PLT-T-01} sont satisfaites au niveau médian. Les
+trajets isolés présentant des dépassements (typiquement des trajets
+longs avec démarrage à froid~: \texttt{TripA07}, \texttt{TripB07})
+ont fait l'objet d'une analyse spécifique~: l'écart est dominé par
+la dérive du nœud thermique sur des durées supérieures à 30~minutes,
+phénomène attendu compte tenu de la simplicité du modèle thermique
+adopté à l'équation~(\ref{eq:noeud_thermique}).
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{\centering\vspace{2.2cm}
+    \textit{[Comparaison simulation / mesure réelle : trois sous-graphes
+    superposés (\(V_\text{pack}\), SoC, \(T_\text{pack}\)) sur un trajet
+    représentatif, avec RMSE annotée dans le titre de chaque sous-graphe]}
+    \vspace{2.2cm}}}
+  \caption{Comparaison simulation \emph{plant} vs mesure réelle sur un
+  trajet représentatif. Les RMSE annotées sont calculées sur la totalité
+  du trajet.}
+  \label{fig:ch3_comparaison_plant}
+\end{figure}
+
+\paragraph{Comportement du BMS (REQ-LL-BMS-*).}
+La suite BMS regroupe vingt-quatre tests qui exercent l'ensemble des
+fonctions du \emph{slave} et du \emph{master} sur des scénarios
+synthétiques calibrés~: rampe de tension franchissant successivement
+les trois seuils OV, plateau de température au-delà du seuil OT,
+saut de courant en charge dépassant le seuil de surcharge, etc.
+La dernière campagne complète (\texttt{MIL\_20260511\_033738.json})
+clôt la suite \emph{vmon\,/\,tmon\,/\,imon\,/\,pwr} avec
+8~tests sur 8 en succès. Aucun \emph{regression} n'a été observée
+sur la campagne complète des vingt-quatre tests BMS exécutée le
+même jour.
+
+\paragraph{Prédicteur (REQ-LL-PRD-*).}
+La suite prédicteur est exécutée sur l'ensemble \emph{test} des
+trajets, qui n'a jamais été vu pendant l'entraînement. Les résultats
+extraits de \texttt{MIL\_20260511\_040306.json} sont
+exceptionnellement favorables~: les taux de détection par classe
+atteignent 97{,}68~\% (OT), 78{,}82~\% (OV) et 83{,}57~\% (UV),
+tous au-dessus du seuil de 75~\% imposé par
+\texttt{REQ-LL-PRD-DR-01}~; le taux de fausses alarmes sur trajets
+nominaux est de 0{,}017~\%, soit trois ordres de grandeur sous le
+plafond de 10~\% imposé par \texttt{REQ-LL-PRD-FAR-01}~; les
+\emph{lead times} médians sont de 84{,}3~s pour l'OT (vs 30~s requis),
+68{,}6~s pour l'OV (vs 10~s) et 66{,}4~s pour l'UV (vs 10~s),
+chiffres rassurants pour la marge d'action laissée au superviseur.
+
+\subsection{SIL — Génération de code et cohérence numérique}
+\label{subsec:ch3_validation_sil}
+
+La phase SIL exécute le code C généré par \emph{Embedded Coder} pour
+le \emph{master} dans une co-simulation \textsc{Simulink}, puis
+compare ses sorties à celles obtenues en MIL sur le trajet
+\texttt{TripA02} (1413~s, sélectionné pour son contenu spectral
+représentatif). Les huit signaux comparés couvrent l'intégralité des
+sorties fonctionnelles du \emph{master}~: sévérité globale de
+défaut, SoC pack, SoH pack, limites de puissance en charge et en
+décharge, bits d'autorisation d'équilibrage, probabilités du
+prédicteur et alarmes correspondantes. La table~\ref{tab:ch3_resultats_sil}
+synthétise les résultats publiés dans \texttt{SIL.json}.
+
+\begin{table}[H]
+  \centering
+  \caption{Équivalence MIL vs SIL sur \texttt{TripA02}
+  (\texttt{validator/reports/SIL.json}, 11~mai 2026). Tolérances
+  appliquées~: \(10^{-2}\) relative ou \(10^{-4}\) absolue.}
+  \label{tab:ch3_resultats_sil}
+  \small
+  \begin{tabular}{|l|c|c|}
+    \hline
+    \textbf{Signal}                & \textbf{Erreur max}            & \textbf{Verdict} \\
+    \hline
+    fault\_severity                & 0                              & PASS \\
+    \hline
+    SoC\_pack                      & \(2{,}69 \times 10^{-11}\)     & PASS \\
+    \hline
+    SoH\_pack                      & 0                              & PASS \\
+    \hline
+    P\_limit\_chg                  & 0                              & PASS \\
+    \hline
+    P\_limit\_dchg                 & 0                              & PASS \\
+    \hline
+    enable\_bal\_8                 & 0                              & PASS \\
+    \hline
+    prob\_3 (sortie LSTM)          & \(8{,}64 \times 10^{-6}\)      & PASS \\
+    \hline
+    alarm\_3                       & 0                              & PASS \\
+    \hline
+  \end{tabular}
+\end{table}
+
+Six signaux sur huit présentent une équivalence \emph{strictement}
+exacte (erreur nulle), ce qui confirme l'absence de
+non-déterminisme dans la génération de code entière (FSM, debounce,
+sorties booléennes). Les deux signaux non nuls correspondent à des
+calculs flottants~: le SoC, dont l'erreur de \(10^{-11}\) est due à
+la commutativité non garantie de l'addition flottante dans le filtre
+de Kalman, et la sortie LSTM, dont l'erreur de \(10^{-5}\) reflète
+la traduction \emph{double~$\rightarrow$~single} appliquée par
+défaut par \emph{Embedded Coder} aux blocs \emph{Predict}. Ces deux
+écarts restent largement sous les tolérances de
+\texttt{REQ-LL-SIL-EQ-01}.
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{\centering\vspace{2.2cm}
+    \textit{[Résultats comparatifs MIL vs SIL : 8 sous-graphes en
+    overlay (MIL en bleu, SIL en orange) + sous-graphe |error|
+    par signal vs ligne de tolérance]}
+    \vspace{2.2cm}}}
+  \caption{Comparaison MIL vs SIL sur \texttt{TripA02}, signal par
+  signal, avec ligne de tolérance superposée
+  (\texttt{validator/reports/plots/sil/SIL-EQ-01.png}).}
+  \label{fig:ch3_sil_comparaison}
+\end{figure}
+
+\subsection{PIL — Exécution sur cible, timing et ressources}
+\label{subsec:ch3_validation_pil}
+
+La phase PIL déploie le \emph{master} sur la carte
+\emph{NUCLEO-H7A3ZI-Q} équipée du microcontrôleur STM32H7A3 cadencé
+à 280~MHz, et l'exécute en co-simulation avec
+\textsc{Simulink} via la liaison série \texttt{USART3} exposée en
+\texttt{COM3}. Le binaire est compilé en optimisation \texttt{-O3} et
+le profilage temps d'exécution s'appuie sur le compteur
+\emph{free-running} TIM5 (1~tick = 3{,}57~ns), tandis que la base
+de temps HAL est portée sur TIM7 pour ne pas perturber la mesure.
+
+\paragraph{Équivalence numérique du prédicteur (REQ-LL-PIL-PRD-01).}
+La sortie \texttt{prob\_3} du LSTM exécuté sur cible diffère de la
+référence MIL d'au plus \(1{,}19 \times 10^{-7}\) sur 30~s
+d'exécution (\texttt{validator/reports/PIL.json}), soit quatre ordres
+de grandeur sous la tolérance de \(10^{-3}\) imposée par
+\texttt{REQ-LL-PIL-PRD-01}. Cette précision quasi parfaite confirme
+que le portage du réseau ONNX sur la cible Cortex-M7 préserve les
+propriétés numériques du modèle de référence.
+
+\paragraph{Temps d'exécution (REQ-LL-RT-WCET-01).}
+Le profilage produit une trace de la durée de chaque pas de calcul
+sur l'ensemble de l'horizon de simulation. Après élimination des
+cinq premiers pas (\emph{warmup} compensant l'initialisation des
+poids LSTM et le préchauffage du cache), la durée maximale
+observée sur les pas suivants est de 1000{,}6~µs
+(\texttt{PIL\_20260511\_034602.json}). Ce chiffre est dix fois
+inférieur au budget de 10~ms imposé par
+\texttt{REQ-LL-RT-WCET-01}, ce qui correspond à un taux d'utilisation
+CPU d'environ 1~\% en cadence nominale 100~ms. Cette marge laisse
+une réserve confortable pour des évolutions futures du \emph{master}
+ou pour des dégradations matérielles (vieillissement, températures
+extrêmes).
+
+\paragraph{Empreinte mémoire (REQ-LL-RT-RAM-01).}
+La mesure de la mémoire RAM statique (\texttt{data}~+~\texttt{bss})
+du binaire embarqué est obtenue par \texttt{arm-none-eabi-size}
+appliqué à l'ELF généré. Le résultat reste sous le plafond de
+256~kio fixé par \texttt{REQ-LL-RT-RAM-01}, lui-même choisi pour
+laisser plus d'un mégaoctet libre sur le 1{,}4~Mio de RAM
+embarquée du STM32H7A3.
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{\centering\vspace{2.2cm}
+    \textit{[Résultats PIL : (gauche) trace par pas de la durée
+    d'exécution avec budget = 10 ms en ligne pointillée, max et
+    p99 annotés ; (droite) histogramme de distribution des durées
+    avec max et budget en lignes verticales]}
+    \vspace{2.2cm}}}
+  \caption[Profilage PIL du \emph{master} sur STM32H7A3 -- WCET max 1000{,}6~µs]{Profilage temps d'exécution du \emph{master} sur la cible
+  STM32H7A3 (\texttt{REQ-LL-RT-WCET-01}, max~=~1000{,}6~µs sur
+  budget 10~ms).}
+  \label{fig:ch3_pil_wcet}
+\end{figure}
+
+\subsection{Couverture de code et synthèse globale}
+\label{subsec:ch3_couverture_synthese}
+
+La couverture structurelle des modèles est calculée en parallèle des
+tests MIL et stockée dans \texttt{COV.json}. Sur la dernière campagne
+(\texttt{COV\_20260511\_033741.json}), la couverture
+\emph{Execution} atteint 100~\% sur les 44~blocs du \emph{slave} et
+sur les 216~blocs du \emph{master}, ce qui satisfait l'exigence
+\texttt{REQ-LL-COV-DEAD-01} (zéro bloc inatteignable). Les
+métriques de couverture \emph{Decision} et \emph{Condition}, bien
+que renvoyées à titre informationnel, restent contrastées~: 55 et
+98~\% pour le \emph{slave}, 48 et 76~\% pour le \emph{master}. La
+couverture \emph{MC/DC} du \emph{master} (9{,}8~\%) est dominée par
+un opérateur logique à quatre entrées dans
+\texttt{Balancing\_Arbitrator}, structurellement difficile à
+exercer~; ce point est documenté comme une limitation acceptée et
+fait l'objet d'une mention dans le rapport d'analyse statique.
+
+La table~\ref{tab:ch3_synthese_validation} synthétise les résultats
+de l'ensemble des phases de validation unitaire du modèle.
+
+\begin{table}[H]
+  \centering
+  \caption[Synthèse des métriques de validation unitaire du modèle (mai~2026)]{Synthèse des métriques de validation unitaire du modèle
+  (campagne du 11~mai 2026, rapports
+  \texttt{validator/reports/\{plant\_convergence,MIL,SIL,PIL,COV\}.json}).}
+  \label{tab:ch3_synthese_validation}
+  \small
+  \begin{tabularx}{\textwidth}{|l|c|X|l|}
+    \hline
+    \textbf{Phase} & \textbf{Tests} & \textbf{Indicateur clé} & \textbf{Verdict} \\
+    \hline
+    PLANT (MIL)        & 3   & RMSE médianes \(V/\mathrm{SoC}/T = 1{,}05\) V / 0{,}45 \% / 0{,}70 \textcelsius{} & 3 / 3 PASS \\
+    \hline
+    BMS (MIL)          & 24  & FSM, EKF, FSM, watchdog, equalisation, PWR, etc.        & 24 / 24 PASS \\
+    \hline
+    Predictor (MIL)    & 5   & DR \(\geq\) 78{,}8 \%, FAR = 0{,}017 \%, lead \(\geq\) 66{,}4 s & 5 / 5 PASS \\
+    \hline
+    SIL                & 1   & 8 signaux équivalents (max err \(8{,}6\!\times\!10^{-6}\)) & 1 / 1 PASS \\
+    \hline
+    PIL — Predictor    & 1   & \(\Delta\mathrm{prob}_3 = 1{,}19\!\times\!10^{-7}\)        & 1 / 1 PASS \\
+    \hline
+    PIL — WCET         & 1   & 1000{,}6~µs sur budget 10~ms                            & 1 / 1 PASS \\
+    \hline
+    PIL — RAM          & 1   & RAM statique sous 256~kio                               & 1 / 1 PASS \\
+    \hline
+    Coverage           & 1   & Exec 100 \% (260 blocs), 0 bloc inatteignable           & 1 / 1 PASS \\
+    \hline
+    \textbf{Total}     & \textbf{37} & — & \textbf{37 / 37 PASS} \\
+    \hline
+  \end{tabularx}
+\end{table}
+
+\section{Conclusion}
+\label{sec:ch3_conclusion}
+
+Ce chapitre a déroulé la branche Modèle du V-model dual du projet,
+depuis les exigences héritées du chapitre~\ref{chap:analyse_specification}
+jusqu'à la validation unitaire complète du système sous test sur
+cible STM32H7A3. La modélisation du \emph{plant} a été conduite à
+partir d'un jeu de soixante-dix trajets BMW~i3 réels, en suivant la
+méthode classique d'extraction directe pour les paramètres statiques
+puis de \emph{fitting} non linéaire pour les paramètres dynamiques.
+Le modèle ECM~2RC ainsi identifié converge en médiane à 1{,}05~V de
+RMSE de tension, 0{,}45~\% de RMSE de SoC et 0{,}70~\textcelsius{} de
+RMSE de température, valeurs largement en deçà des seuils
+contractuels de 4~V, 1~\% et 1~\textcelsius.
+
+Le système BMS a été développé selon une architecture maître-esclave
+conforme aux pratiques industrielles~: huit \emph{slave} chargés de
+la surveillance de proximité et d'un équilibrage passif local, et un
+\emph{master} unique hébergeant les fonctions critiques d'estimation
+(SoC par EKF, SoH par double mécanisme), de gestion des défauts (FSM
+verrouillée à \emph{Shut}, watchdog des slaves, protection
+matérielle), d'arbitrage de l'équilibrage et de limitation de
+puissance. Le prédicteur LSTM, entraîné sur un jeu généré par
+injection de défauts physiques en boucle fermée et déployé en ONNX,
+atteint des taux de détection supérieurs à 78~\% par classe et anticipe
+les défauts de plusieurs dizaines de secondes — au moins 66~s en
+médiane sur les classes UV et OV — sur l'ensemble \emph{test} des
+trajets.
+
+La phase ascendante du V-model a été franchie avec succès~: la
+totalité des trente-sept tests automatisés MIL, SIL et PIL produisent
+un verdict PASS sur la campagne du 11~mai 2026, avec des marges
+particulièrement confortables sur le temps d'exécution embarqué
+(1000~µs sur un budget de 10~ms) et sur l'équivalence numérique
+hôte~$\rightarrow$~cible (\(10^{-7}\) sur la sortie LSTM). La
+couverture structurelle \emph{Execution} atteint 100~\% sur les
+260~blocs du \emph{master} et du \emph{slave}, démontrant l'absence
+de code mort dans les modèles de contrôle.
+
+Le chapitre suivant déroule la branche Logicielle de la même manière~:
+exigences héritées du chapitre~\ref{chap:analyse_specification},
+architecture modulaire (Validateur, Analyseur, Générateur de
+rapports, Orchestrateur, Interface utilisateur), implémentation des
+modules en Python et MATLAB, et tests unitaires automatisés. Les
+deux branches seront enfin réunies au
+chapitre~\ref{chap:integration_validation} pour les phases
+d'intégration et d'acceptation qui clôturent le V-model dual.
