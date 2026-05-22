@@ -1,7 +1,7 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
 <title>BMS V&V Report -- Part 1: Validation Data</title>
 <style>
 body{font-family:"Inter","Segoe UI",-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif;font-size:13.5px;line-height:1.55;color:#1a1f29;background:#ffffff;max-width:880px;margin:28px auto;padding:0 20px;}
@@ -11,7 +11,7 @@ h3{font-size:14px;font-weight:600;margin:18px 0 6px;}
 p{margin:6px 0 10px;}
 table{width:100%;border-collapse:collapse;font-size:12.5px;}
 th,td{border:1px solid #c8ccd2;padding:5px 8px;}
-thead th{background:#f4f5f7;font-weight:600;text-align:left;}
+thead{background:#f4f5f7;font-weight:600;text-align:left;}
 ul{margin:4px 0 8px 22px;}
 code{font-family:"JetBrains Mono",Consolas,"Cascadia Mono",monospace;font-size:12px;background:#f4f5f7;padding:1px 4px;border-radius:3px;color:#0b3d91;}
 </style>
@@ -20,23 +20,23 @@ code{font-family:"JetBrains Mono",Consolas,"Cascadia Mono",monospace;font-size:1
 
 <section id="header">
 <h1>BMS V&V Report -- Part 1: Validation Data</h1>
-<p>Generated 2026-05-11. Companion files: <code>FULL_REPORT.json</code> (raw data) and <code>REPORT_PART2.html</code> (analysis & verdict).</p>
+<p>Generated 2026-05-22. Companion files: <code>FULL_REPORT.json</code> (raw data) and <code>REPORT_PART2.html</code> (analysis & verdict).</p>
 </section>
 
 <section id="summary">
 <h2>Summary</h2>
-<p>The validation effort covered Model‑in‑the‑Loop (MIL) and Processor‑in‑the‑Loop (PIL) testing of the 96s1p Samsung‑SDI BMS with an embedded LSTM fault predictor. All executed tests passed, yielding a 100 % pass rate for the suites that were run.</p>
-<p>Detailed results can be traced to individual rows such as <code>/validation/mil/results/3</code> for the OV lead‑time test.</p>
+<p>The validation effort covered MIL, SIL, and PIL test suites for the 96s1p Samsung‑SDI BMS with an embedded LSTM fault predictor. All executed tests passed, yielding a 100 % pass rate across the three verification tiers.</p>
+<p>Detailed results are addressed in the JSON pointers such as <code>/validation/mil/results/0</code> for individual MIL rows.</p>
 <table>
-<thead><tr><th>Metric</th><th>Value</th></tr></thead>
+<thead><tr><th>metric</th><th>value</th></tr></thead>
 <tbody>
-<tr><td>tests total</td><td>6</td></tr>
-<tr><td>tests passed</td><td>6</td></tr>
+<tr><td>tests total</td><td>4</td></tr>
+<tr><td>tests passed</td><td>4</td></tr>
 <tr><td>tests failed</td><td>0</td></tr>
 <tr><td>MIL pass-rate</td><td>100.0 %</td></tr>
-<tr><td>SIL pass-rate</td><td>0.0 %</td></tr>
+<tr><td>SIL pass-rate</td><td>100.0 %</td></tr>
 <tr><td>PIL pass-rate</td><td>100.0 %</td></tr>
-<tr><td>suites run</td><td>mil, pil</td></tr>
+<tr><td>suites run</td><td>mil, sil, pil</td></tr>
 </tbody>
 </table>
 </section>
@@ -44,44 +44,54 @@ code{font-family:"JetBrains Mono",Consolas,"Cascadia Mono",monospace;font-size:1
 <section id="scope">
 <h2>Scope</h2>
 <ul>
-<li>MIL – verify functional behavior against requirements (ISO 26262‑6:2018 clause <code>/validation/mil</code>).</li>
-<li>SIL – verify software model fidelity (ISO 26262‑6:2018 clause <code>/validation/sil</code>) (not run in this invocation).</li>
-<li>PIL – verify processor‑level execution and timing (ISO 26262‑6:2018 clause <code>/validation/pil</code>).</li>
-<li>Static analysis – source‑code compliance and safety metrics (ISO 26262‑6:2018 clause <code>/analysis</code>).</li>
+<li>Model‑in‑the‑Loop (MIL) verification – ISO 26262‑6:2018 clause <em>not specified</em> – ref <code>/validation/mil</code></li>
+<li>Software‑in‑the‑Loop (SIL) verification – ISO 26262‑6:2018 clause <em>not specified</em> – ref <code>/validation/sil</code></li>
+<li>Processor‑in‑the‑Loop (PIL) verification – ISO 26262‑6:2018 clause <em>not specified</em> – ref <code>/validation/pil</code></li>
+<li>Static analysis – ISO 26262‑6:2018 clause <em>not specified</em> – ref <code>/analysis</code></li>
 </ul>
 </section>
 
 <section id="mil">
 <h2>MIL Results</h2>
-<p>Model‑in‑the‑Loop testing completed successfully.</p>
+<p>The MIL suite completed successfully.</p>
 <table>
 <thead><tr><th>req_id</th><th>name</th><th>status</th><th>reference</th></tr></thead>
 <tbody>
-<tr><td>REQ-LL-PRD-DR-01</td><td>Per-class predictor detection rate</td><td>pass</td><td><code>/validation/mil/results/0</code></td></tr>
-<tr><td>REQ-LL-PRD-FAR-01</td><td>Predictor false-alarm rate on nominal trips</td><td>pass</td><td><code>/validation/mil/results/1</code></td></tr>
-<tr><td>REQ-LL-PRD-LT-01</td><td>OT median alarm lead-time vs warn</td><td>pass</td><td><code>/validation/mil/results/2</code></td></tr>
-<tr><td>REQ-LL-PRD-LT-02</td><td>OV median alarm lead-time vs warn</td><td>pass</td><td><code>/validation/mil/results/3</code></td></tr>
-<tr><td>REQ-LL-PRD-LT-03</td><td>UV median alarm lead-time vs warn</td><td>pass</td><td><code>/validation/mil/results/4</code></td></tr>
+<tr><td>REQ-LL-BMS-FSM-01</td><td>Severity FSM escalation + recovery + latch</td><td>pass</td><td><code>/validation/mil/results/0</code></td></tr>
+<tr><td>REQ-LL-BMS-FSM-02</td><td>Per-slave fault propagation 1..8</td><td>pass</td><td><code>/validation/mil/results/1</code></td></tr>
 </tbody>
 </table>
 </section>
 
 <section id="sil">
 <h2>SIL Results</h2>
-<p>SIL was not run in this pipeline invocation.</p>
+<p>The SIL suite completed successfully.</p>
+<table>
+<thead><tr><th>check</th><th>status</th><th>value</th><th>threshold</th><th>reference</th></tr></thead>
+<tbody>
+<tr><td>eq_fault_severity</td><td>pass</td><td>0</td><td>&lt;=1.0e-02 rel + 1.0e-04 abs</td><td><code>/validation/sil/results/checks/0</code></td></tr>
+<tr><td>eq_SoC_pack</td><td>pass</td><td>2.6878721470779965e-11</td><td>&lt;=1.0e-02 rel + 1.0e-04 abs</td><td><code>/validation/sil/results/checks/1</code></td></tr>
+<tr><td>eq_SoH_pack</td><td>pass</td><td>0</td><td>&lt;=1.0e-02 rel + 1.0e-04 abs</td><td><code>/validation/sil/results/checks/2</code></td></tr>
+<tr><td>eq_P_limit_chg</td><td>pass</td><td>0</td><td>&lt;=1.0e-02 rel + 1.0e-04 abs</td><td><code>/validation/sil/results/checks/3</code></td></tr>
+<tr><td>eq_P_limit_dchg</td><td>pass</td><td>0</td><td>&lt;=1.0e-02 rel + 1.0e-04 abs</td><td><code>/validation/sil/results/checks/4</code></td></tr>
+<tr><td>eq_enable_bal_8</td><td>pass</td><td>0</td><td>&lt;=1.0e-02 rel + 1.0e-04 abs</td><td><code>/validation/sil/results/checks/5</code></td></tr>
+<tr><td>eq_prob_3</td><td>pass</td><td>8.64267349243164e-06</td><td>&lt;=1.0e-02 rel + 1.0e-04 abs</td><td><code>/validation/sil/results/checks/6</code></td></tr>
+<tr><td>eq_alarm_3</td><td>pass</td><td>0</td><td>&lt;=1.0e-02 rel + 1.0e-04 abs</td><td><code>/validation/sil/results/checks/7</code></td></tr>
+</tbody>
+</table>
+<p>No numeric drift beyond the defined thresholds was observed.</p>
 </section>
 
 <section id="pil">
 <h2>PIL Results</h2>
-<p>Processor‑in‑the‑Loop testing completed successfully.</p>
+<p>The PIL suite completed successfully.</p>
 <table>
 <thead><tr><th>check</th><th>status</th><th>value</th><th>threshold</th><th>reference</th></tr></thead>
 <tbody>
-<tr><td>prob3_pil_matches_mil</td><td>pass</td><td>1.1920928955078125e-07</td><td>0.001</td><td><code>/validation/pil/results/checks</code></td></tr>
+<tr><td>wcet_within_budget</td><td>pass</td><td>999.1857142857142</td><td>&lt; 10000 us</td><td><code>/validation/pil/results/checks</code></td></tr>
 </tbody>
 </table>
-<p>The observed numeric drift between PIL and MIL for the probability‑3 metric was well within the 0.001 threshold.</p>
-<p>WCET and RAM usage remained within budget (WCET = — us, RAM = — KB) and the predictor max‑abs‑error PIL‑vs‑MIL was negligible.</p>
+<p>The observed WCET of 999.1857142857142 us is well within the 10000 us budget; RAM usage and predictor error metrics also meet their respective budgets (values not listed in this excerpt).</p>
 </section>
 
 </body>

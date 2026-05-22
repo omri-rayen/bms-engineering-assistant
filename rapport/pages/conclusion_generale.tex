@@ -1,29 +1,28 @@
-%% Conclusion generale — 1 page
+%% Conclusion generale
 \chapter*{Conclusion générale}
 \addcontentsline{toc}{chapter}{Conclusion générale}
 
-Le projet \emph{BMS Engineering Assistant} a atteint l'ensemble de ses
-objectifs. Deux livrables complémentaires ont été produits et intégrés~:
-un BMS \textsc{Simulink} complet (mod\`{e}le ECM~2RC, FSM de protection,
-équilibrage, pronostic LSTM) validé sur soixante-dix trajets mesurés~;
-et un pipeline logiciel automatisé qui pilote la campagne de validation,
-en analyse les résultats par un moteur de règles YAML, puis synthétise un
-rapport HTML exploité par un LLM.
+Le projet a permis de construire une chaîne cohérente d'assistance à la
+conception et à la validation d'un BMS intelligent. Le premier apport est la
+mise en place d'un modèle de procédé capable de fournir un environnement de
+simulation représentatif. Le deuxième apport est la modélisation du BMS sous
+test, avec une architecture maître-esclave, des fonctions déterministes de
+surveillance et un prédicteur de défauts utilisé comme information
+d'anticipation. Le troisième apport est le développement d'un assistant
+logiciel qui orchestre les validations, organise les résultats, applique une
+analyse par règles et prépare une restitution exploitable par l'ingénieur BMS.
 
-Les résultats clés obtenus sont les suivants~: toutes les 86~exigences
-couvrent à 100~\% après intégration~; le temps d'exécution WCET PIL
-mesuré (1000{,}6~µs) représente moins de 11~\% du budget de 10~ms~;
-le prédicteur LSTM détecte les trois types de défauts avec une latence
-inférieure à 250~ms et zéro faux-positif sur le dataset de référence~;
-la campagne complète s'exécute en moins de 15~minutes à froid, et en
-moins de 2~minutes avec les caches actifs.
+La méthodologie suivie a permis de séparer clairement le procédé, le système
+sous test et l'outil logiciel. Cette séparation améliore la lisibilité du
+travail et évite de confondre la validation du modèle physique avec la
+validation du BMS ou avec celle de l'assistant. Les exigences détaillées sont
+regroupées en annexe afin que le lecteur puisse les inspecter sans alourdir le
+corps du rapport. Les résultats présentés montrent que la chaîne obtenue est
+capable de relier les modèles, les tests, l'analyse et les rapports dans un
+flux unique.
 
-Trois axes principaux d'évolution se dessinent. L'extension du catalogue
-de défauts aux scénarios combinés (déséquilibre simultané à un emballement
-thermique) constitue la priorité de court terme. Le portage à une cible
-automobile certifiable (\emph{Infineon AURIX TC4xx}~/ \emph{NXP S32K3})
-permettra d'apprécier la robustesse de la chaîne \emph{Embedded Coder}
-face aux contraintes ASIL-B. Enfin, la substitution du service Groq par
-un modèle local (\textsc{vLLM}~/ \textsc{Ollama}) est immédiatement
-faisable et garantira l'indépendance vis-à-vis de tout fournisseur
-exterieur pour une mise en production à l'échelle industrielle.
+Les perspectives principales concernent l'extension vers une validation HIL,
+la séparation de l'interface en modes de travail adaptés au même ingénieur BMS
+et la maîtrise de la génération de rapports par un service plus contrôlé ou un
+modèle local. Ces évolutions prolongeraient naturellement le travail réalisé
+vers un outil plus proche d'un environnement industriel de validation.

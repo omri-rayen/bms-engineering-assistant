@@ -29,6 +29,13 @@ for i = 1:numel(refs)
     set_param(m, 'HardwareBoard',     'None');
     set_param(m, 'ProdHWDeviceType',  'Intel->x86-64 (Windows64)');
     set_param(m, 'TargetHWDeviceType','Intel->x86-64 (Windows64)');
+    % A prior PIL build leaves Toolchain pinned to the ARM cross-compiler
+    % and PortableWordSizes off; SIL refuses both. Reset to a host
+    % toolchain (auto-selected) and enable portable word sizes so the
+    % generated code is compiled with the host compiler.
+    try, set_param(m, 'Toolchain',         'Automatically locate an installed toolchain'); catch, end %#ok<CTCH>
+    try, set_param(m, 'ProdEqTarget',      'on'); catch, end %#ok<CTCH>
+    try, set_param(m, 'PortableWordSizes', 'on');  catch, end %#ok<CTCH>
     % MIL coverage may have left CovEnable on; SIL/PIL builds refuse to
     % mix coverage with profiling and the saved .slx may carry it too.
     try, set_param(m, 'CovEnable',      'off'); catch, end %#ok<CTCH>

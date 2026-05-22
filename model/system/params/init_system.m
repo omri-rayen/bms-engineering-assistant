@@ -57,11 +57,15 @@ T_cool_on  = 35;  T_cool_off = T_cool_target;
 %% Cell-to-cell variation (deterministic, persisted to disk)
 cellVarFile = fullfile(INIT_MODEL_ROOT, 'system', 'params', 'cell_variability.mat');
 if ~exist('cell_Q_Ah', 'var') || isempty(cell_Q_Ah)
+    tmp = struct();
     if isfile(cellVarFile)
-        tmp = load(cellVarFile, 'cell_Q_Ah', 'cell_dSoC_pct', 'cell_RO_scale');
+        tmp = load(cellVarFile);
+    end
+    if isfield(tmp, 'cell_dT_C')
         cell_Q_Ah     = tmp.cell_Q_Ah;
         cell_dSoC_pct = tmp.cell_dSoC_pct;
         cell_RO_scale = tmp.cell_RO_scale;
+        cell_dT_C     = tmp.cell_dT_C;     % zero-mean thermal offsets [12x8 degC]
     else
         rng(42, 'twister');                              % fixed seed (REQ-PLANT-06)
         % Cell-to-cell spread reflects an end-of-warranty production pack:
@@ -77,7 +81,13 @@ if ~exist('cell_Q_Ah', 'var') || isempty(cell_Q_Ah)
         % Systematic inter-module SoC bias (~4 % range across 8 modules)
         cell_dSoC_pct = cell_dSoC_pct + linspace(-2, 2, 8);
         cell_dSoC_pct = max(min(cell_dSoC_pct, 5.0), -5.0);
-        save(cellVarFile, 'cell_Q_Ah', 'cell_dSoC_pct', 'cell_RO_scale');
+        % Cell-to-cell thermal dispersion at t=0: sigma=1.5 degC, zero-mean
+        % so that mean(T_cells_init(:)) == T_init_scalar exactly (REQ-PLANT-06).
+        % Draw is part of the same seeded block so the thermal IC is
+        % consistent with the electrical variability across all sessions.
+        noise     = randn(12, 8);
+        cell_dT_C = 1.5 * (noise - mean(noise(:)));
+        save(cellVarFile, 'cell_Q_Ah', 'cell_dSoC_pct', 'cell_RO_scale', 'cell_dT_C');
         fprintf('cell_variability.mat created (seed 42) at %s\n', cellVarFile);
     end
 end
@@ -86,7 +96,10 @@ end
 fn = fieldnames(trips_meas);
 T_init_scalar = double(trips_meas.(fn{1}).T_cell_C(1));
 if ~exist('T_cells_init', 'var') || isempty(T_cells_init)
-    T_cells_init = T_init_scalar * ones(12, 8);
+    % Apply cell-to-cell thermal dispersion around the measured pack
+    % temperature. cell_dT_C is zero-mean (guaranteed at generation time)
+    % so mean(T_cells_init(:)) == T_init_scalar exactly.
+    T_cells_init = T_init_scalar + cell_dT_C;
 end
 if ~exist('T_cool_init', 'var') || isempty(T_cool_init), T_cool_init = T_init_scalar; end
 if ~exist('V_RC1_init',  'var') || isempty(V_RC1_init),  V_RC1_init  = 0; end

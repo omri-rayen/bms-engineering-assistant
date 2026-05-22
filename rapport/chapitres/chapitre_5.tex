@@ -1,445 +1,257 @@
-%% ============================================================
-%% CHAPITRE 5 — INTEGRATION ET VALIDATION GLOBALE
-%% ============================================================
-%% Session  : 5
-%% Auteur   : [Nom etudiant]
-%% Redige le: 12 mai 2026
-%% Cible    : 10-12 pages
-%% ============================================================
-
-\chapter{Intégration et validation globale}
-\label{chap:integration_validation}
+\reportchapter{Conception et développement de la partie logicielle}
+\label{chap:partie_logicielle}
 
 \section{Introduction}
 \label{sec:ch5_introduction}
 
-Les chapitres~\ref{chap:partie_modele} et~\ref{chap:partie_logicielle}
-ont successivement déroulé les deux branches descendantes du V-model
-dual~: la branche Modèle, qui a livré un système sous test
-fonctionnel et validé unitairement (\emph{plant} ECM~2RC, BMS
-\emph{master} et \emph{slave}, prédicteur LSTM intégré), et la
-branche Logicielle, qui a livré l'outil intelligent qui pilote,
-analyse et synthétise la chaîne de validation
-(Validateur~/~Analyseur~/~Générateur de rapports~/~Orchestrateur~/~UI).
-Ces deux branches ne se rencontrent qu'au sommet remontant du V~: la
-phase d'intégration combine les deux livrables en un système
-complet et la phase d'acceptation vérifie l'adéquation du tout aux
-besoins formulés au chapitre~\ref{chap:analyse_specification}. Ce
-chapitre décrit cette double convergence.
+Les chapitres précédents ont établi le modèle du procédé puis le BMS sous test. La partie logicielle du projet répond à un autre besoin : fournir à l'ingénieur BMS un outil capable de lancer les validations, collecter les résultats, analyser les modèles et produire un rapport exploitable sans manipuler séparément les outils techniques sous-jacents.
 
-\section{Stratégie d'intégration des deux branches}
-\label{sec:ch5_strategie_integration}
+\noindent
+Le logiciel développé n'est donc pas un composant embarqué du BMS. Il constitue une couche d'assistance d'ingénierie placée autour des modèles. Son rôle est de rendre la chaîne de validation plus reproductible, plus lisible et plus facile à auditer. La conception suit une logique simple : chaque ensemble possède une responsabilité claire, chaque résultat important est conservé sous une forme structurée, et les ensembles communiquent par des données inspectables plutôt que par des états implicites.
 
-\subsection{Point de convergence dans le V-model dual}
-\label{subsec:ch5_point_convergence}
+\section{Architecture logicielle générale}
+\label{sec:ch5_architecture}
 
-Le V-model classique présente une montée unique côté droit~:
-intégration unitaire $\to$ intégration de composants $\to$
-intégration système $\to$ acceptation. Le V dual du projet
-distingue, à la descente, deux branches indépendantes (Modèle et
-Logicielle), mais les fait converger sur une remontée commune~: à
-partir de la phase d'intégration, il n'y a plus qu'un seul flux de
-travaux. Cette particularité est cruciale parce qu'elle impose de
-définir précisément, à l'instant de la jonction, le \emph{contrat
-d'interface} entre les deux livrables. Ce contrat est le suivant~:
-le livrable de la branche Modèle expose les modèles \textsc{Simulink}
-\texttt{bms\_master}, \texttt{bms\_slave} et \texttt{fault\_predictor},
-tous bâtis sur un harnais standard interceptable par
-\texttt{Simulink.SimulationData.Dataset}~; le livrable de la branche
-Logicielle consomme ces trois modèles à travers les helpers du
-package \texttt{validator/+val/} sans connaissance interne de leur
-structure. L'absence de couplage entre les deux livrables au-delà
-de cette interface est validée par la phase d'intégration décrite à
-la section~\ref{sec:ch5_integration}.
+L'architecture logicielle repose sur cinq ensembles principaux. Le validateur exécute les campagnes de validation modèle, code hôte et cible. L'analyseur interprète les résultats et extrait des métriques statiques des modèles. Le générateur de rapports consolide les données et produit des synthèses lisibles. L'orchestrateur enchaîne les phases. L'interface MATLAB expose l'ensemble à l'utilisateur final.
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.95\textwidth]{diagrams/ch5_convergence_v_model.png}
-  \caption{Diagramme de convergence du V-model dual. Les deux
-  branches descendantes sont indépendantes~; les deux phases
-  remontantes (intégration puis acceptation) sont mutualisées.}
-  \label{fig:ch5_convergence_v_model}
+  \fbox{\parbox{0.88\textwidth}{\centering\vspace{2.2cm}
+  \textit{Emplacement réservé à une figure d'architecture logicielle.}\\[0.4em]
+  \small La figure doit montrer le validateur, l'analyseur, le générateur de rapports, les orchestrateurs et l'interface MATLAB, avec les données structurées échangées.
+  \vspace{2.2cm}}}
+  \captionsetup{width=0.84\textwidth, skip=15pt}
+  \caption{Architecture logicielle de l'assistant d'ingénierie BMS.}
+  \label{fig:ch5_architecture_logicielle}
 \end{figure}
 
-\subsection{Prérequis à l'intégration}
-\label{subsec:ch5_prerequis}
+\subsection{Principe de séparation des responsabilités}
+\label{subsec:ch5_separation}
 
-L'intégration n'est réputée déclenchable que lorsque les deux
-livrables ont franchi leur propre validation unitaire. Pour la
-branche Modèle, cela signifie le succès de l'intégralité de la
-campagne MIL/SIL/PIL décrite au
-chapitre~\ref{chap:partie_modele}~: convergence du \emph{plant}
-sous les seuils PLT, taux de réussite à 100~\% sur les tests
-\texttt{REQ-LL-BMS-*} en MIL et SIL, et conformité PIL aux budgets
-WCET et RAM établis pour la cible STM32H7A3. Pour la branche
-Logicielle, cela signifie le succès des 45~tests unitaires Python +
-\textsc{MATLAB} synthétisés au
-chapitre~\ref{chap:partie_logicielle}, table~\ref{tab:ch4_synthese_tests}.
-L'orchestrateur enregistre, à chaque exécution réussie, un
-\emph{snapshot} JSON dans \texttt{validator/reports/} et
-\texttt{analyzer/reports/}~; la présence simultanée de ces snapshots
-constitue le critère d'entrée de la phase d'intégration.
-
-\subsection{Plan d'intégration progressive}
-\label{subsec:ch5_plan_integration}
-
-L'intégration suit un plan progressif en quatre étapes pour
-isoler les éventuels défauts au plus tôt~: (i)~validation que
-l'orchestrateur \texttt{orch.run} découvre correctement les modèles
-\textsc{Simulink} fournis par la branche Modèle (étape de
-\emph{discoverability}), (ii)~validation que le Validateur exerce
-le SUT réel sans dégradation par rapport à l'exécution manuelle des
-mêmes tests (étape de \emph{stim equivalence}), (iii)~validation que
-l'Analyseur produit le même verdict global qu'une analyse manuelle
-des sorties JSON (étape de \emph{verdict equivalence}), et
-(iv)~validation que le Générateur de rapports produit un HTML dont
-toutes les références JSON Pointer résolvent correctement dans le
-\texttt{FULL\_REPORT.json}.
-
-\section{Tests d'intégration}
-\label{sec:ch5_integration}
-
-\subsection{Intégration branche Modèle $\to$ branche Logicielle}
-\label{subsec:ch5_integration_branche}
-
-L'intégration s'opère par invocation de l'orchestrateur sur le SUT
-réel (et non sur un modèle factice de test) avec l'ensemble des
-\emph{flags} actifs~:
-\texttt{python -m orchestrator}. La première vérification porte sur
-la cohérence de l'inventaire des scénarios MIL exposés par
-\texttt{orch.scenarios} avec celui consommé par \texttt{mil.run}~:
-toute divergence (un scénario déclaré côté UI mais non implémenté
-côté tests, ou inversement) est immédiatement remontée comme
-\emph{finding} \texttt{INT-DISC-01}. La table~\ref{tab:ch5_resultats_integration}
-synthétise les résultats des quatre étapes du plan.
+Le découpage retenu évite de concentrer toute la logique dans une application unique. Les traitements liés aux modèles restent proches de l'environnement de simulation et des campagnes MIL, SIL et PIL. Les traitements d'analyse prennent en charge la consolidation, l'application de règles et la génération de rapports. Cette séparation permet de tester chaque partie indépendamment et de remplacer une brique sans modifier toute la chaîne.
 
 \begin{table}[H]
   \centering
-  \caption{Résultats des quatre étapes du plan d'intégration
-  progressive (campagne du 11 mai 2026).}
-  \label{tab:ch5_resultats_integration}
-  \small
-  \begin{tabularx}{\textwidth}{|l|X|c|c|}
-    \hline
-    \textbf{Étape} & \textbf{Critère de succès} & \textbf{Résultat} & \textbf{Verdict} \\
-    \hline
-    Discoverability   & Tous les modèles \texttt{bms\_master}, \texttt{bms\_slave},
-                        \texttt{fault\_predictor} sont chargeables sans
-                        dépendance manquante.                        & 3~/~3 & PASS \\
-    \hline
-    Stim equivalence  & Les sorties MIL/SIL produites par
-                        \texttt{orch.run} reproduisent à 1\,$\sigma$
-                        près celles produites par invocation manuelle
-                        de \texttt{mil.run}~/~\texttt{sil.run}.       & 30~/~30 & PASS \\
-    \hline
-    Verdict equivalence & Le verdict global \emph{ANALYSIS.json} est
-                        identique à celui obtenu en lançant
-                        séparément les phases.                        & 1~/~1 & PASS \\
-    \hline
-    Reference resolution & Tous les pointeurs RFC~6901 du HTML
-                        consolidé résolvent dans
-                        \texttt{FULL\_REPORT.json}.                   & 47~/~47 & PASS \\
-    \hline
-  \end{tabularx}
-\end{table}
-
-\subsection{Validation du Validateur sur le SUT réel}
-\label{subsec:ch5_val_sut_reel}
-
-Le Validateur intégré exécute la totalité de la suite MIL +~SIL +~PIL
-en \emph{passe unique}, avec couverture en ligne et collecte des
-\emph{facts} pour l'analyseur. Le temps total observé sur la
-plateforme de référence (\textsc{Windows~11}, 16~Go RAM,
-\textsc{MATLAB}~R2024b, \texttt{NUCLEO-H7A3ZI-Q} sur USART3 à
-115\,200~baud) est d'environ neuf minutes pour la campagne complète,
-dont environ une minute consacrée au \emph{build} \emph{Embedded
-Coder} pour le PIL et environ trente secondes pour la consolidation
-+~appels LLM. Aucun écart de verdict n'a été relevé entre
-l'exécution intégrée et l'exécution manuelle de chaque phase.
-
-\subsection{Cohérence des signaux échangés}
-\label{subsec:ch5_coherence_signaux}
-
-La cohérence des signaux échangés entre le \emph{plant} et le
-\emph{master} (mesures cellules par cellule de tension, courant,
-température) puis entre le \emph{master} et le \emph{predictor} a
-été vérifiée par déroulement d'un scénario long
-(\texttt{REQ-LL-BMS-LSTM-LONG}) dans lequel le SoC~\emph{pack}
-descend de 90~\% à 15~\% sur quatre cycles de conduite agrégés. La
-totalité des signaux loggés a pu être récupérée par le helper
-\texttt{val.log\_signal} sans perte ni desynchronisation, et le
-\emph{predictor} a maintenu sa sortie \texttt{fault\_likelihood}
-dans la plage \([0,1]\) sur toute la durée du scénario.
-
-\subsection{Flux de données de bout en bout}
-\label{subsec:ch5_flux_e2e}
-
-Le test de bout en bout consiste à lancer
-\texttt{python -m orchestrator} sur le dépôt vierge (\texttt{git
-clean}), à laisser la chaîne se dérouler intégralement, et à
-vérifier que les artefacts attendus apparaissent aux emplacements
-prévus avec la bonne arborescence~: \texttt{validator/reports/MIL.json},
-\texttt{SIL.json}, \texttt{PIL.json}, \texttt{COV.json},
-\texttt{plant\_convergence.json}, \texttt{analyzer/reports/FACTS.json}
-et \texttt{ANALYSIS.json}, \texttt{doc\_generator/reports/FULL\_REPORT.json},
-\texttt{REPORT\_PART1.html} et \texttt{REPORT\_PART2.html}. Les neuf
-artefacts sont systématiquement présents et bien formés à l'issue
-d'une exécution réussie.
-
-\subsection{Anomalies détectées et corrections apportées}
-\label{subsec:ch5_anomalies}
-
-Trois anomalies ont été détectées pendant l'intégration et ont
-toutes été corrigées avant validation finale. La
-table~\ref{tab:ch5_anomalies_corrigees} en synthétise la nature, la
-phase de détection et la résolution.
-
-\begin{table}[H]
-  \centering
-  \caption{Anomalies détectées pendant l'intégration et corrections
-  apportées.}
-  \label{tab:ch5_anomalies_corrigees}
   \small
   \begin{tabularx}{\textwidth}{|l|X|X|}
     \hline
-    \textbf{ID} & \textbf{Anomalie} & \textbf{Correction} \\
+    \textbf{Ensemble} & \textbf{Moyens principaux} & \textbf{Responsabilité} \\
     \hline
-    INT-A01 & Premier appel PIL apres un \emph{cold boot} depasse de
-              100$\times$ le temps des appels suivants~: \emph{warm-up}
-              du cache d'instructions et chargement initial des poids
-              LSTM. & Strategie WCET ajustee~: les N~premieres mesures
-              sont marquees \emph{warmup} et exclues du calcul du
-              maximum (cf. \texttt{tests/matlab/test\_pil\_wcet.m}). \\
+    Validateur & Fonctions de validation proches des modèles & Exécuter les scénarios, comparer les signaux, produire les verdicts et les figures. \\
     \hline
-    INT-A02 & Le proxy \emph{Cloudflare} devant \texttt{api.groq.com}
-              renvoie un HTTP~403 sur le \texttt{User-Agent} par
-              defaut de \texttt{urllib}.   & \texttt{llm\_client.py}
-              fixe maintenant un \texttt{User-Agent} explicite
-              (\texttt{bms-engineering-assistant/1.0}). \\
+    Analyseur & Collecteurs de faits et moteur de règles & Extraire les faits des modèles, appliquer les règles et produire un diagnostic hiérarchisé. \\
     \hline
-    INT-A03 & La fenetre TPM glissante du palier gratuit Groq
-              (8000~tokens/min) declenche occasionnellement un
-              HTTP~413 lorsque la Partie~2 est lancee immediatement
-              apres la Partie~1. & Logique de \emph{retry} unique
-              avec attente d'environ 60~s ajoutee a
-              \texttt{llm\_client.py} (couverture par
-              \path{test_chat_retries_on_429_then_succeeds}). \\
+    Générateur de rapports & Chaîne de consolidation et de synthèse & Consolider les données, réduire le volume utile et générer les rapports audités. \\
+    \hline
+    Orchestrateurs & Points d'entrée automatisé et interactif & Enchaîner les phases en mode automatisé ou depuis l'interface. \\
+    \hline
+    Interface & Application graphique MATLAB & Fournir les vues de pilotage, de consultation et d'inspection au même ingénieur BMS. \\
     \hline
   \end{tabularx}
+  \captionsetup{width=0.9\textwidth, skip=15pt}
+  \caption{Répartition des responsabilités entre les ensembles logiciels.}
+  \label{tab:ch5_responsabilites}
 \end{table}
 
-\section{Tests d'acceptation}
-\label{sec:ch5_acceptation}
+\subsection{Familles d'exigences logicielles}
+\label{subsec:ch5_exigences_logicielles}
 
-\subsection{Protocole de validation}
-\label{subsec:ch5_protocole_acceptation}
-
-La validation d'acceptation a pour objectif de prouver que le
-système intégré satisfait les besoins formulés au
-chapitre~\ref{chap:analyse_specification} et que l'expérience
-utilisateur correspond aux scénarios documentés
-(\texttt{UC-VAL-01} à \texttt{UC-VAL-05}). Le protocole est défini
-en deux niveaux~: une vérification automatique de la matrice de
-traçabilité \texttt{REQ}~$\to$~\texttt{TEST} (section~\ref{subsec:ch5_couverture_exigences})
-et un déroulé manuel des cinq cas d'utilisation par l'ingénieur de
-validation BMS, en présence d'un observateur tiers
-(section~\ref{subsec:ch5_scenarios_utilisateur}).
-
-\subsection{Couverture des exigences}
-\label{subsec:ch5_couverture_exigences}
-
-La matrice de traçabilité \texttt{REQ}~$\to$~\texttt{TEST}
-introduite à la section~\ref{sec:ch2_tracabilite} et matérialisée
-par le tableau~\ref{tab:ch2_tracabilite_matrice} a été parcourue
-ligne par ligne. Pour chacune des entrées, l'identifiant du test
-correspondant a été cherché dans \texttt{validator/requirements/requirements.json}
-puis exécuté individuellement. La table~\ref{tab:ch5_couverture_acceptation}
-rassemble la couverture par famille d'exigence.
+Les exigences logicielles sont regroupées par famille fonctionnelle. Le texte du chapitre conserve cette logique de regroupement pour ne pas alourdir la lecture avec une liste d'identifiants trop longue. Le catalogue complet des exigences modèle et logiciel est reporté en annexe, où le lecteur peut inspecter les identifiants et le contenu compacté.
 
 \begin{table}[H]
   \centering
-  \caption{Couverture d'acceptation par famille d'exigence après
-  intégration.}
-  \label{tab:ch5_couverture_acceptation}
   \small
-  \begin{tabular}{|l|c|c|c|}
+  \begin{tabularx}{\textwidth}{|l|c|X|}
     \hline
-    \textbf{Famille} & \textbf{Total} & \textbf{Couvertes} & \textbf{Couverture} \\
+    \textbf{Famille} & \textbf{Nombre} & \textbf{Périmètre} \\
     \hline
-    \texttt{REQ-HL-*}  (haut niveau)            & 12 & 12 & 100~\% \\
+    Orchestration automatisée & 3 & Exécution contrôlée des phases depuis un point d'entrée automatisé. \\
     \hline
-    \texttt{REQ-LL-PRD-*} (predicteur)          & 14 & 14 & 100~\% \\
+    Génération de rapports & 7 & Consolidation, réduction, génération de synthèse et audit des références. \\
     \hline
-    \texttt{REQ-LL-BMS-*} (BMS master+slave)    & 22 & 22 & 100~\% \\
+    Analyse & 7 & Construction du contexte d'analyse, moteur de règles et hiérarchisation des constats. \\
     \hline
-    \texttt{REQ-LL-PLT-*} (plant)               &  6 &  6 & 100~\% \\
+    Orchestration interactive & 5 & Pilotage des campagnes depuis l'interface. \\
     \hline
-    \texttt{REQ-LL-COV-*} (coverage)            &  3 &  3 & 100~\% \\
+    Validation & 5 & Aides de validation, extraction de signaux, scénarios, figures et export structuré. \\
     \hline
-    \texttt{REQ-SW-*}    (logiciel)             & 29 & 29 & 100~\% \\
+    Collecte de faits & 2 & Collecte des métriques statiques des modèles. \\
     \hline
-    \textbf{Total}                               & \textbf{86} & \textbf{86} & \textbf{100~\%} \\
+    \textbf{Total} & \textbf{29} & Exigences logicielles documentées et reliées aux tests. \\
     \hline
-  \end{tabular}
+  \end{tabularx}
+  \captionsetup{width=0.88\textwidth, skip=15pt}
+  \caption{Regroupement des exigences logicielles par famille.}
+  \label{tab:ch5_familles_req_sw}
 \end{table}
 
-\subsection{Scénarios de test utilisateur}
-\label{subsec:ch5_scenarios_utilisateur}
+\section{Module de validation}
+\label{sec:ch5_validateur}
 
-Les cinq scénarios utilisateur (\texttt{UC-VAL-01} à
-\texttt{UC-VAL-05}) ont été déroulés manuellement~: lancement d'une
-campagne complète depuis l'UI (\texttt{UC-VAL-01}), sélection
-fine de scénarios MIL et exécution sans SIL ni PIL
-(\texttt{UC-VAL-02}), consultation d'un rapport HTML archivé
-(\texttt{UC-VAL-03}), restauration d'un modèle modifié vers son
-\emph{snapshot} (\texttt{UC-VAL-04}), et export du
-\texttt{FULL\_REPORT.json} pour archivage hors session
-(\texttt{UC-VAL-05}). Tous les scénarios ont été exécutés sans
-intervention extérieure et sans erreur visible. Les temps de réponse
-mesurés (de l'action utilisateur à la rétroaction visuelle de l'UI)
-sont restés sous 200~ms pour les opérations non bloquantes
-(navigation entre vues, sélection dans une table, ouverture d'un
-rapport HTML), et les opérations longues (lancement d'une campagne)
-sont systématiquement accompagnées de la barre de progression et des
-\emph{phase chips} actualisées en temps réel.
+Le validateur est la base expérimentale de l'outil. Il transforme les modèles Simulink et les scénarios de test en rapports structurés. Son architecture reprend les niveaux de validation utilisés pour le BMS : validation du procédé, MIL, SIL et PIL. Les fonctions transverses assurent la préparation des entrées, la récupération des signaux, la comparaison des résultats et l'export des rapports.
 
-\subsection{Résultats et conformité}
-\label{subsec:ch5_resultats_conformite}
+\subsection{Organisation des campagnes}
+\label{subsec:ch5_campagnes}
 
-À l'issue de la phase d'acceptation, les 86~exigences sont couvertes
-à 100~\%, les cinq cas d'utilisation sont opérationnels et les
-trois anomalies INT-A* identifiées en intégration sont closes.
-L'observateur tiers a validé le déroulé des cinq scénarios sans
-réserve. Le système est donc déclaré \emph{accepté pour livraison}
-à l'équipe BMS, ce qui clôt formellement la branche remontante du
-V-model dual.
+La validation du procédé reste séparée du pipeline BMS. Elle évalue la fidélité du modèle physique sur les trajets réels. La validation BMS suit ensuite une progression MIL, SIL et PIL. Le MIL vérifie les fonctions sur modèle, le SIL compare le comportement du code généré sur hôte avec la référence Simulink, et le PIL vérifie l'exécution sur la cible STM32.
 
-\section{Analyse des résultats et performances}
-\label{sec:ch5_analyse_perf}
-
-\subsection{Qualité et précision des rapports générés}
-\label{subsec:ch5_qualite_rapports}
-
-La qualité des rapports HTML produits par le Générateur a été
-évaluée selon trois critères~: \emph{exactitude factuelle}
-(absence d'invention par le LLM), \emph{auditabilité}
-(résolution complète des références) et \emph{lisibilité}
-(synthèse exploitable par un manager non technique). L'exactitude est
-garantie par construction grâce à l'audit RFC~6901 et n'a, sur la
-campagne d'acceptation, signalé aucun pointeur cassé. La lisibilité
-a été évaluée subjectivement par lecture croisée de trois rapports
-issus de scénarios variés~: dans tous les cas, la section de tête
-expose en moins d'une minute de lecture le verdict global et les
-trois indicateurs clés (taux de réussite global, sévérité maximale
-\emph{ANALYSIS.json}, conformité PIL). Cette synthèse exécutive
-correspond au besoin métier exprimé en
-section~\ref{sec:ch2_besoins_fonctionnels}.
-
-\subsection{Performances temps d'exécution}
-\label{subsec:ch5_perfs_temps}
-
-La table~\ref{tab:ch5_perfs_globales} synthétise les temps mesurés
-sur la plateforme de référence pour chaque phase d'une campagne
-complète. Les valeurs reflètent une exécution \og{}à froid\fg{},
-sans cache \texttt{slprj/} pré-existant ni binaire SIL/PIL
-préalablement compilé~; les exécutions ultérieures bénéficient des
-caches et tombent typiquement à environ deux minutes pour la
-campagne complète quand seuls les tests MIL changent.
+\noindent
+Cette organisation évite de mélanger deux questions différentes. Le procédé doit d'abord être suffisamment représentatif pour servir d'environnement. Le BMS est ensuite évalué dans cet environnement selon des niveaux de confiance croissants.
 
 \begin{table}[H]
   \centering
-  \caption{Synthèse des performances temps d'exécution mesurées sur
-  la plateforme de référence (campagne complète à froid, mai~2026).}
-  \label{tab:ch5_perfs_globales}
   \small
-  \begin{tabular}{|l|c|c|}
+  \begin{tabularx}{\textwidth}{|l|X|X|}
     \hline
-    \textbf{Phase}                                     & \textbf{Durée mesurée} & \textbf{Part du total} \\
+    \textbf{Niveau} & \textbf{Objectif} & \textbf{Sorties principales} \\
     \hline
-    Initialisation \textsc{MATLAB} (\emph{cold start}) & 5~min 30~s             & 36~\% \\
+    Procédé & Comparer tension pack, SoC et température aux mesures BMW i3. & Métriques de convergence et figures par trajet. \\
     \hline
-    MIL +~couverture (en passe unique)                 & 1~min 10~s             &  8~\% \\
+    MIL & Vérifier les fonctions BMS et prédicteur avant génération de code. & Rapport structuré, figures de scénario et données de couverture. \\
     \hline
-    SIL (build~+~tests)                                & 1~min 50~s             & 12~\% \\
+    SIL & Vérifier l'équivalence entre modèle et code généré sur hôte. & Rapport structuré et figures d'équivalence. \\
     \hline
-    PIL (flash~+~tests)                                & 5~min 00~s             & 33~\% \\
+    PIL & Vérifier la cohérence numérique et le temps d'exécution sur cible embarquée. & Rapport structuré, mesures de temps et figures associées. \\
     \hline
-    Collecte de \emph{facts} \texttt{ana.collect}      & 0~min 25~s             &  3~\% \\
-    \hline
-    Analyseur Python                                   & 0~min 05~s             & $<$1~\% \\
-    \hline
-    Générateur de rapports (2~appels Groq)             & 0~min 30~s             &  3~\% \\
-    \hline
-    \textbf{Total}                                     & \textbf{$\approx$~15~min} & \textbf{100~\%} \\
-    \hline
-  \end{tabular}
+  \end{tabularx}
+  \captionsetup{width=0.9\textwidth, skip=15pt}
+  \caption{Rôle des niveaux de validation pilotés par le logiciel.}
+  \label{tab:ch5_niveaux_validation}
 \end{table}
 
-L'initialisation \textsc{MATLAB} et la phase PIL sont les deux
-contributeurs dominants au temps total~; les optimisations
-ultérieures cibleront en priorité ces deux postes (réutilisation de
-session \textsc{MATLAB} entre exécutions, scripts de \emph{warmup}
-côté \texttt{NUCLEO}). Les phases logicielles pures (analyseur,
-générateur) ne représentent que $\sim$~6~\% du temps total et ne
-nécessitent pas d'optimisation.
+\subsection{Rapports et figures}
+\label{subsec:ch5_rapports_validateur}
 
-\subsection{Fiabilité du predicteur LSTM}
-\label{subsec:ch5_fiabilite_lstm}
+Les rapports du validateur utilisent une structure volontairement simple. Chaque test porte un identifiant d'exigence, un nom, un statut et une liste de vérifications élémentaires. Les figures générées complètent ces rapports en montrant les signaux d'entrée, les réponses attendues, les seuils et les verdicts. Ce choix facilite l'audit : une synthèse peut être lue rapidement, mais les détails restent disponibles pour remonter jusqu'au signal qui justifie le verdict.
 
-Le predicteur LSTM intégré au \emph{master} a été soumis aux trois
-scénarios de défaut documentés dans
-\texttt{REQ-LL-PRD-DR-*}~: dérive de tension, défaut isolation,
-emballement thermique. Pour chacun des trois scénarios, le seuil de
-détection (\texttt{fault\_likelihood} > 0,75) a été franchi dans le
-quart de seconde suivant l'apparition du défaut, ce qui satisfait
-largement l'exigence \texttt{REQ-LL-PRD-DR-LATENCY-01}
-(latence~<~1~s). Le taux de faux-positifs mesuré sur les soixante-dix
-trajets nominaux du dataset Steinstraeter~\cite{Steinstraeter2020}
-est resté nul, ce qui satisfait
-\texttt{REQ-LL-PRD-DR-FALSEPOS-01}.
+\section{Module d'analyse}
+\label{sec:ch5_analyseur}
 
-\subsection{Limites identifiées et perspectives}
-\label{subsec:ch5_limites}
+L'analyseur ajoute une couche d'interprétation au-dessus des résultats bruts. Il ne modifie pas les modèles et ne corrige pas automatiquement les défauts. Il collecte des faits, applique des règles et produit des constats classés par sévérité. Cette approche correspond mieux au rôle de l'outil : assister l'ingénieur BMS dans son diagnostic, tout en lui laissant la décision finale.
 
-Trois limites identifiées pendant l'acceptation justifient des
-travaux ultérieurs. Premièrement, le système actuel ne couvre que
-des scénarios mono-cellule simples~: une extension aux \emph{défauts
-combinés} (par exemple un déséquilibre de tension simultané à un
-emballement thermique) demande une augmentation du dataset
-d'entraînement et l'ajout des scénarios MIL correspondants.
-Deuxièmement, la cible PIL est limitée à un seul micro-contrôleur
-(\texttt{STM32H7A3})~; le portage à une cible automobile certifiable
-(par exemple \emph{Infineon AURIX TC4xx} ou \emph{NXP S32K3})
-demanderait une re-qualification complète de la chaîne \emph{Embedded
-Coder}. Troisièmement, le Générateur de rapports dépend d'une API
-externe (\textbf{Groq})~: bien que l'isolation HTTP rende la
-substitution triviale, la mise en production éventuelle imposerait
-soit un fournisseur sous SLA contractuel, soit le déploiement local
-d'un modèle équivalent (\texttt{gpt-oss-120b} en
-\textsc{vLLM}~/~\textsc{Ollama}).
+\subsection{Collecte des faits}
+\label{subsec:ch5_collecte_faits}
+
+Les collecteurs inspectent les modèles du maître, des esclaves et du prédicteur. Ils extraient des informations sur la structure des modèles, les automates, les solveurs, les signaux, les blocs de calcul, les données et la génération de code. Le résultat est regroupé dans un rapport de faits qui sert de base stable au moteur d'analyse.
+
+\noindent
+Le collecteur a été conçu pour rester non intrusif. Il lit les modèles, filtre les faux positifs liés aux blocs de bibliothèque et agrège les défauts de nommage par parent afin d'éviter une accumulation de messages peu exploitables.
+
+\subsection{Moteur de règles}
+\label{subsec:ch5_moteur_regles}
+
+Le moteur d'analyse charge les faits, les rapports de validation, les exigences modèle et une base de connaissances déclarative. Les règles couvrent notamment la couverture structurelle, l'architecture du modèle, les conventions de modélisation et les résultats MIL, SIL et PIL. Chaque constat contient une sévérité, une explication, une recommandation et, lorsque cela est possible, un lien de localisation vers l'élément concerné dans Simulink.
+
+\noindent
+La base de règles centralise les seuils par composant. Le BMS maître est traité comme le composant le plus critique, le BMS esclave comme un composant de surveillance locale, et le prédicteur comme une fonction informative. Cette séparation évite de donner le même poids à un défaut sur la chaîne de sûreté déterministe et à un défaut sur une fonction d'aide à l'anticipation.
+
+\section{Module de génération de rapports}
+\label{sec:ch5_generateur}
+
+Le générateur de rapports transforme les données techniques en documents lisibles. Il est organisé autour de trois idées : conserver une version complète non modifiée des données, construire une version réduite pour la génération de texte, puis auditer toutes les références présentes dans le résultat final.
+
+\subsection{Consolidation des données}
+\label{subsec:ch5_consolidation}
+
+Le rapport complet conserve les résultats MIL, SIL, PIL et analyse sous une structure unique. Il n'est pas réécrit ni simplifié. Une vue plus légère est ensuite construite pour la génération automatique. Chaque entrée importante conserve un lien de traçabilité vers sa source dans le rapport complet.
+
+\noindent
+Ce mécanisme est essentiel pour éviter une synthèse non vérifiable. Le rapport généré peut être agréable à lire, mais toute affirmation technique doit rester reliée à un emplacement précis dans les données brutes.
+
+\subsection{Génération de synthèse en deux parties}
+\label{subsec:ch5_generation_html}
+
+La génération de synthèse est divisée en deux parties. La première partie présente les tableaux de validation. La seconde partie présente l'analyse d'ingénierie et le verdict. Cette séparation réduit la taille de chaque requête envoyée au modèle de langage et rend le résultat plus stable. Le générateur peut également fonctionner en mode de simulation, dans lequel seules les données structurées sont produites. Ce mode reste utile pour les tests et pour les situations où aucun service de génération textuelle n'est disponible.
+
+\subsection{Audit des références}
+\label{subsec:ch5_audit_refs}
+
+Après génération, les références citées dans la synthèse sont vérifiées. Elles doivent résoudre vers une entrée réelle du rapport complet. Cette étape empêche qu'une référence inventée soit publiée comme preuve.
+
+\section{Orchestration du pipeline}
+\label{sec:ch5_orchestrateur}
+
+Deux orchestrateurs coexistent. Le premier est destiné aux exécutions automatisées. Le second est utilisé par l'application graphique. Leur coexistence répond à deux usages différents : automatiser une campagne depuis un environnement de validation, ou piloter la même logique depuis l'environnement de travail de l'ingénieur BMS.
+
+\subsection{Orchestrateur automatisé}
+\label{subsec:ch5_orch_python}
+
+L'orchestrateur automatisé construit la séquence d'exécution, enchaîne les phases demandées, puis lance l'analyseur et le générateur de rapports. Il accepte des options de saut de phase, ce qui permet de réutiliser des résultats existants ou de contourner le PIL lorsque la carte cible n'est pas connectée. Cette variante est adaptée aux campagnes reproductibles et aux usages proches de l'intégration continue.
+
+\subsection{Orchestrateur MATLAB}
+\label{subsec:ch5_orch_matlab}
+
+L'orchestrateur interactif fournit le pilotage intégré à l'interface. Il accepte les niveaux de validation sélectionnés, les filtres MIL, SIL et PIL, l'option de réutilisation du code généré, ainsi que le suivi du journal et de la progression. La couverture est collectée avec le MIL lorsqu'elle est pertinente, puis les faits, l'analyse et le rapport sont produits dans la continuité.
+
+\noindent
+Le catalogue de scénarios alimente les listes de l'interface. Les scénarios MIL sont regroupés par famille fonctionnelle, tandis que les scénarios SIL et PIL restent plus compacts. Cette organisation donne à l'utilisateur un contrôle suffisamment fin sans l'obliger à connaître l'organisation interne des tests.
+
+\section{Interface utilisateur MATLAB}
+\label{sec:ch5_ui}
+
+L'interface est une application MATLAB intégrée à l'environnement déjà utilisé pour les modèles. Le public visé est un seul acteur : l'ingénieur BMS. Il peut toutefois utiliser l'outil dans deux postures différentes, une posture de développement lorsqu'il ouvre ou restaure les modèles, et une posture de validation lorsqu'il lance les campagnes et inspecte les rapports.
+
+\subsection{Vues disponibles}
+\label{subsec:ch5_vues}
+
+L'application est organisée en cinq vues. La vue Dashboard donne l'état général et les actions rapides. La vue Validate permet de configurer et lancer les campagnes. La vue Reports liste les rapports générés et permet de les ouvrir, exporter ou supprimer. La vue Plots affiche les figures issues des validations. La vue Model donne accès aux modèles éditables, à la restauration de snapshots et à l'export du code PIL.
+
+\begin{table}[H]
+  \centering
+  \small
+  \begin{tabularx}{\textwidth}{|l|X|}
+    \hline
+    \textbf{Vue} & \textbf{Usage principal} \\
+    \hline
+    Dashboard & Visualiser l'état de l'outil, le dernier lancement et les actions rapides. \\
+    \hline
+    Validate & Choisir MIL, SIL, PIL, filtrer les scénarios, suivre la progression et consulter le journal. \\
+    \hline
+    Reports & Parcourir les rapports générés, les exporter ou les supprimer après confirmation. \\
+    \hline
+    Plots & Prévisualiser les figures produites par les tests. \\
+    \hline
+    Model & Ouvrir les modèles, restaurer les snapshots et exporter le code PIL disponible. \\
+    \hline
+  \end{tabularx}
+  \captionsetup{width=0.86\textwidth, skip=15pt}
+  \caption{Vues principales de l'application MATLAB.}
+  \label{tab:ch5_vues_ui}
+\end{table}
+
+\subsection{Gestion de la progression}
+\label{subsec:ch5_progression_ui}
+
+L'exécution du pipeline reste dans le processus MATLAB principal, car l'initialisation des modèles dépend de l'environnement courant. L'interface compense cette contrainte par des mises à jour explicites de l'affichage. Les journaux et la barre de progression sont donc rafraîchis entre les étapes du pipeline, ce qui maintient une rétroaction visible pendant les campagnes longues.
+
+\section{Vérification logicielle}
+\label{sec:ch5_verification_logicielle}
+
+La vérification logicielle combine des tests automatisés, des tests MATLAB ciblés et une recette manuelle de l'interface. Les tests automatisés couvrent l'analyseur, le générateur de rapports, la consolidation, les consignes de génération, le client de génération textuelle et l'orchestrateur automatisé. Les tests MATLAB disponibles ciblent notamment les scénarios, la liste des rapports et les aides de validation.
+
+\noindent
+La suite Python a été relancée pendant la préparation de cette version du rapport. Elle comporte 43 tests et se termine sans échec. La validation de l'interface reste volontairement manuelle, car elle porte sur des interactions graphiques, des confirmations utilisateur et la lisibilité des vues.
+
+\begin{table}[H]
+  \centering
+  \small
+  \begin{tabularx}{\textwidth}{|l|X|c|}
+    \hline
+    \textbf{Famille de vérification} & \textbf{Périmètre} & \textbf{Résultat disponible} \\
+    \hline
+    Tests automatisés & Analyseur, générateur de rapports, consolidation, consignes de génération, client de génération textuelle et orchestrateur automatisé. & 43 / 43 réussis \\
+    \hline
+    Tests MATLAB ciblés & Scénarios, liste des rapports et aides de validation. & Tests présents \\
+    \hline
+    Recette UI & Parcours des vues, lancement d'une campagne, consultation des rapports et restauration de modèle. & Recette manuelle \\
+    \hline
+  \end{tabularx}
+  \captionsetup{width=0.88\textwidth, skip=15pt}
+  \caption{Synthèse des vérifications logicielles disponibles.}
+  \label{tab:ch5_verification_logicielle}
+\end{table}
 
 \section{Conclusion}
 \label{sec:ch5_conclusion}
 
-Ce chapitre a clos la phase remontante du V-model dual du projet
-\emph{BMS Engineering Assistant} en menant à bien deux phases
-mutualisées entre les deux branches~: l'intégration et
-l'acceptation. L'intégration a confirmé l'absence de couplage
-parasite entre le SUT (chapitre~\ref{chap:partie_modele}) et l'outil
-logiciel (chapitre~\ref{chap:partie_logicielle}), et a permis
-d'identifier puis de corriger trois anomalies opérationnelles
-(\texttt{INT-A01} à \texttt{INT-A03}). L'acceptation a démontré la
-couverture à 100~\% des 86~exigences de toutes familles confondues
-et le bon déroulé des cinq cas d'utilisation par un ingénieur de
-validation BMS en conditions réelles. Les performances temps
-d'exécution sont compatibles avec un usage quotidien et
-le budget de temps disponible côté ingénieur~; les trois limites
-identifiées tracent les axes d'évolution naturels de l'outil.
-
-Le système ainsi accepté constitue le livrable final du projet de
-fin d'études~; il sera maintenant remis à l'équipe BMS pour
-exploitation et déploiement industriel. La conclusion générale du
-rapport revient sur les contributions principales du projet et
-ouvre sur les perspectives à plus long terme (extension du
-catalogue de défauts, qualification ISO~26262 de l'outil au sens
-TCL\,2~/~TCL\,3, déploiement multi-cibles).
+La partie logicielle réalisée fournit une chaîne cohérente autour des modèles BMS : elle lance les validations, structure les résultats, analyse les modèles, génère des rapports et expose l'ensemble dans une interface MATLAB. Le choix de données structurées inspectables donne une continuité entre exécution, analyse et justification. Le chapitre suivant traite l'intégration de cette chaîne avec le système sous test, puis la recette globale de l'outil par l'ingénieur BMS.

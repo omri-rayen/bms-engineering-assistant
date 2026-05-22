@@ -1,31 +1,36 @@
-%% Introduction generale — 1 page
 \chapter*{Introduction générale}
 \addcontentsline{toc}{chapter}{Introduction générale}
 
-L'électrification accélérée du parc automobile mondial place le \emph{Battery
-Management System} au c\oe{}ur des défis ingénieurs des prochaines décennies.
-Valider un \bms couvre aujourd'hui des centaines d'exigences réparties
-entre le modèle de cellule, les algorithmes embarqués, la génération de
-code et les tests d'intégration. Reliés par un V-model
-rigoureux, ces activités sont encore trop souvent menées manuellement,
-avec des outils hétérogènes, sans traçabilité automatisée et sans
-capacité de synthèse intelligente.
+L'électrification du transport place la batterie de traction au coeur des
+architectures automobiles modernes. Sa sécurité, sa disponibilité et sa durée
+de vie dépendent fortement du \emph{système de gestion de batterie} (BMS), qui
+surveille les grandeurs électriques et thermiques, estime les états internes et
+déclenche les protections nécessaires. Le développement d'un tel système impose
+donc une démarche structurée, capable de relier la modélisation, la génération
+de code, les essais sur cible et l'analyse des résultats.
 
-Ce projet de fin d'études propose et implémente un \textbf{outil intelligent
-d'assistance à la conception et à la validation des \bms}, fondé sur un
-V-model dual~: une branche Modèle produit et teste un \bms complet
-(\emph{plant} ECM~2RC, maître, esclaves, prédicteur LSTM) sous
-\textsc{Simulink}~; une branche Logicielle produit un pipeline
-automatisé (Validateur, Analyseur, Générateur de rapports LLM,
-Orchestrateur, Interface utilisateur). La convergence des deux branches
-constitue la démonstration finale de la valeur ajoutée de l'approche.
+\noindent Dans la pratique, ces activités restent souvent réparties entre plusieurs
+outils et plusieurs formats de sortie. Cette fragmentation complique la
+préparation des campagnes de validation, affaiblit la traçabilité entre les
+exigences et les essais, et ralentit l'exploitation des rapports techniques.
+La problématique centrale de ce projet consiste ainsi à rendre la validation
+d'un \bms{} plus cohérente, plus automatisée et plus facilement interprétable,
+sans masquer les exigences propres aux systèmes embarqués critiques.
 
-Le rapport est structuré en cinq chapitres. Le \textbf{chapitre~1}
-pose le cadre industriel et l'état de l'art (V-model, outils de
-validation, apports de l'IA). Le \textbf{chapitre~2} analyse les
-besoins et spécifie les 86~exigences du système. Le \textbf{chapitre~3}
-décrit la branche Modèle et présente ses résultats de validation
-(MIL, SIL, PIL). Le \textbf{chapitre~4} décrit la branche Logicielle
-et ses 45~tests unitaires. Le \textbf{chapitre~5} documente
-l'intégration des deux branches et la validation d'acceptation
-complète.
+\noindent C'est dans ce cadre que s'inscrit ce projet de fin d'études, réalisé au sein de
+Capgemini Engineering. Il propose un outil intelligent d'assistance à la
+conception et à la validation des \bms{}, appuyé sur un environnement de
+simulation et sur un pipeline de vérification progressif. Le principe général
+repose sur un cycle en V à double branche : une branche dédiée au système sous
+test et une branche dédiée à l'outil qui l'accompagne. Les choix de
+modélisation, d'orchestration, d'analyse et de génération de rapports sont
+présentés progressivement afin de conserver la logique de développement du
+projet.
+
+\noindent Le rapport est organisé en six chapitres. Le premier chapitre fixe le cadre du
+projet, les notions nécessaires, l'existant, la problématique et la démarche
+retenue. Le deuxième formalise les besoins et les exigences. Le troisième
+présente le modèle du procédé. Le quatrième développe le \bms{} étudié et sa
+validation. Le cinquième décrit l'outil logiciel d'assistance. Le sixième
+rassemble enfin l'intégration, la recette et l'évaluation globale de la
+solution.
